@@ -20,8 +20,10 @@ Finally, turn on the PPU to display video.
 #define TILE 0xd8
 #define ATTR 0
 
-void handle_pad(char pad_result, int* x_pos, int* y_pos)
+void handle_pad(int* x_pos, int* y_pos)
   {
+    char pad_result = pad_poll(0);
+  
     if(pad_result & 128) // Down
     {
       *x_pos += 1;
@@ -65,19 +67,20 @@ void main(void) {
     8, 0, TILE+2, ATTR,
     8, 8, TILE+3, ATTR,
     128};
-  char pad_result;
   
-  // set palette colors
+  // set palette colors.
   pal_col(0,0x06);	// set screen to dark blue
   pal_col(1,0x17);	// fuchsia
   pal_col(2,0x28);	// grey
   pal_col(3,0x0f);	// white
   
+  // Character palette colors.
   pal_col(17, 0x11);
   pal_col(18, 0x2d);
   pal_col(19, 0x32);
 
   // write text to name table
+  // Used to set "Static" Tiles for map creation.
   vram_adr(NTADR_A(1,1));		// set address
   vram_write("This is", 7);	// write bytes to video RAM
   vram_adr(NTADR_A(1,2));
@@ -132,12 +135,9 @@ void main(void) {
       vrambuf_put(NTADR_A(1, 4), "            ", 12);
     }
     
-    pad_result = pad_poll(0);
+    handle_pad(&sprite_x, &sprite_y); // Input Handling.
     
-    handle_pad(pad_result, &sprite_x, &sprite_y);
-    
-    //sprite_x += dir;
-    oam_meta_spr(sprite_x, sprite_y, attributes, metasprite);
+    oam_meta_spr(sprite_x, sprite_y, attributes, metasprite); // Drawing Character to the screen.
     
     vrambuf_flush();
   }
