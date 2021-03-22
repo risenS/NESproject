@@ -8,6 +8,7 @@ Finally, turn on the PPU to display video.
 
 #include "neslib.h"
 #include "vrambuf.h"
+#define NES_MIRRORING 1
 #include "bcd.h"
 
 
@@ -19,11 +20,42 @@ Finally, turn on the PPU to display video.
 #define TILE 0xd8
 #define ATTR 0
 
+void handle_pad(char pad_result, int* x_pos, int* y_pos)
+  {
+    if(pad_result & 128) // Down
+    {
+      *x_pos += 1;
+    }
+    if(pad_result & 64) // Up
+    {
+      *x_pos -= 1;
+    }
+    if(pad_result & 32) // Right
+    {
+      *y_pos += 1;
+    }
+    if(pad_result & 16) // Left
+    {
+      *y_pos -= 1;
+    }
+    if(pad_result & 8) // Start
+    {
+    }
+    if(pad_result & 4) // Select
+    {
+    }
+    if(pad_result & 2) // B
+    {
+    }
+    if(pad_result & 1) // A
+    {
+    }
+  }
+
 // main function, run after console reset
 void main(void) {
   int sprite_x = 16;
   int sprite_y = 142;
-  short dir = 1;
   char attributes = 0;
   int i;
   char door[12] = "On the door";
@@ -33,6 +65,7 @@ void main(void) {
     8, 0, TILE+2, ATTR,
     8, 8, TILE+3, ATTR,
     128};
+  char pad_result;
   
   // set palette colors
   pal_col(0,0x06);	// set screen to dark blue
@@ -67,6 +100,7 @@ void main(void) {
   vrambuf_clear();
   set_vram_update(updbuf);
   
+  
   // infinite loop
   while (1)
   {
@@ -74,27 +108,19 @@ void main(void) {
     
     if(sprite_x + 16 >= 248)
     {
-      dir *= -1;
-      metasprite[3] ^= 1 << 6;
-      metasprite[7] ^= 1 << 6;
-      metasprite[11] ^= 1 << 6;
-      metasprite[15] ^= 1 << 6;
-      metasprite[0] = 8;
-      metasprite[4] = 8;
-      metasprite[8] = 0;
-      metasprite[12] = 0;
+      sprite_x -= 1;
     }
     else if(sprite_x <= 8)
     {
-      dir *= -1;
-      metasprite[3] ^= 1 << 6;
-      metasprite[7] ^= 1 << 6;
-      metasprite[11] ^= 1 << 6;
-      metasprite[15] ^= 1 << 6;
-      metasprite[0] = 0;
-      metasprite[4] = 0;
-      metasprite[8] = 8;
-      metasprite[12] = 8;
+      sprite_x += 1;
+      //metasprite[3] ^= 1 << 6;
+      //metasprite[7] ^= 1 << 6;
+      //metasprite[11] ^= 1 << 6;
+      //metasprite[15] ^= 1 << 6;
+      //meta_sprite[0] = 0;
+      //meta_sprite[4] = 0;
+      //meta_sprite[8] = 8;
+      //meta_sprite[12] = 8;
     }
     
     if(sprite_x + 16 >= 232 && sprite_x + 16 <= 248 && sprite_y + 8 >= 144 && sprite_y <= 160)
@@ -106,7 +132,11 @@ void main(void) {
       vrambuf_put(NTADR_A(1, 4), "            ", 12);
     }
     
-    sprite_x += dir;
+    pad_result = pad_poll(0);
+    
+    handle_pad(pad_result, &sprite_x, &sprite_y);
+    
+    //sprite_x += dir;
     oam_meta_spr(sprite_x, sprite_y, attributes, metasprite);
     
     vrambuf_flush();
