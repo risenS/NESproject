@@ -5,10 +5,9 @@ Set the screen background color and palette colors.
 Then write a message to the nametable.
 Finally, turn on the PPU to display video.
 */
-
+#define NES_MIRRORING 1
 #include "neslib.h"
 #include "vrambuf.h"
-#define NES_MIRRORING 1
 #include "bcd.h"
 
 
@@ -20,44 +19,71 @@ Finally, turn on the PPU to display video.
 #define TILE 0xd8
 #define ATTR 0
 
-void handle_pad(int* x_pos, int* y_pos)
-  {
+void handle_pad(int* pos_x, int* pos_y, int* cam_x, int* cam_y)
+ {
     char pad_result = pad_poll(0);
   
-    if(pad_result & 128) // Down
+  if(pad_result & 128) // Right
     {
-      *x_pos += 1;
+      if(*cam_x < 0 && *pos_x == 120)
+        *cam_x += 1;
+      else
+      {
+        if(*pos_x + 8 < 240)
+          *pos_x += 1;
+      }
     }
-    if(pad_result & 64) // Up
+  if(pad_result & 64) // Left
     {
-      *x_pos -= 1;
+      if(*cam_x > 0 && *pos_x == 120)
+      	*cam_x -= 1;
+      else
+      {
+        if(*pos_x - 8 > 0)
+          *pos_x -= 1;
+      }
     }
-    if(pad_result & 32) // Right
+  if(pad_result & 32) // Down
     {
-      *y_pos += 1;
+      if(*cam_y < 0 && *pos_y == 120)
+        *cam_y += 1;
+      else
+      {
+        if(*pos_y + 32 < 240)
+          *pos_y += 1;
+      }
     }
-    if(pad_result & 16) // Left
+  if(pad_result & 16) // Up
     {
-      *y_pos -= 1;
+      if(*cam_y > -240 && *pos_y == 120)
+      	*cam_y -= 1;
+      else
+      {
+        if(*pos_y - 8> 0)
+          *pos_y -= 1;
+      }
     }
-    if(pad_result & 8) // Start
+  if(pad_result & 8) // Start
     {
     }
-    if(pad_result & 4) // Select
+  if(pad_result & 4) // Select
     {
     }
-    if(pad_result & 2) // B
+  if(pad_result & 2) // B
     {
     }
-    if(pad_result & 1) // A
+  if(pad_result & 1) // A
     {
     }
-  }
+  return;
+ }
 
 // main function, run after console reset
 void main(void) {
-  int sprite_x = 16;
-  int sprite_y = 142;
+  int player_x = 120;
+  int player_y = 120;
+  int cam_x = 0;
+  int cam_y = 0;
   char attributes = 0;
   int i;
   char door[12] = "On the door";
@@ -109,13 +135,6 @@ void main(void) {
   {
     char cur_oam = 0;
     
-    if(sprite_x + 16 >= 248)
-    {
-      sprite_x -= 1;
-    }
-    else if(sprite_x <= 8)
-    {
-      sprite_x += 1;
       //metasprite[3] ^= 1 << 6;
       //metasprite[7] ^= 1 << 6;
       //metasprite[11] ^= 1 << 6;
@@ -124,20 +143,13 @@ void main(void) {
       //meta_sprite[4] = 0;
       //meta_sprite[8] = 8;
       //meta_sprite[12] = 8;
-    }
+      
+    handle_pad(&player_x, &player_y, &cam_x, &cam_y);
     
-    if(sprite_x + 16 >= 232 && sprite_x + 16 <= 248 && sprite_y + 8 >= 144 && sprite_y <= 160)
-    {
-      vrambuf_put(NTADR_A(1, 4), door, 12);
-    }
-    else
-    {
-      vrambuf_put(NTADR_A(1, 4), "            ", 12);
-    }
+    scroll(cam_x, cam_y);
     
-    handle_pad(&sprite_x, &sprite_y); // Input Handling.
+    oam_meta_spr(player_x, player_y, attributes, metasprite);
     
-    oam_meta_spr(sprite_x, sprite_y, attributes, metasprite); // Drawing Character to the screen.
     
     vrambuf_flush();
   }
