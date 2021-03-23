@@ -52,7 +52,7 @@ void handle_pad(int* pos_x, int* pos_y, int* cam_x, int* cam_y)
   
   if(pad_result & 128) // Right
     {
-      if(*cam_x < 248 && *pos_x == 120)
+      if(*cam_x < 8 && *pos_x == 120)
         *cam_x += 1;
       else
       {
@@ -76,13 +76,13 @@ void handle_pad(int* pos_x, int* pos_y, int* cam_x, int* cam_y)
         *cam_y += 1;
       else
       {
-        if(*pos_y + 32 < 240)
+        if(*pos_y + 64 < 240)
           *pos_y += 1;
       }
     }
   if(pad_result & 16) // Up
     {
-      if(*cam_y > -372 && *pos_y == 120)
+      if(*cam_y > -292 && *pos_y == 120)
       	*cam_y -= 1;
       else
       {
@@ -111,6 +111,7 @@ void main(void) {
   int player_y = 120;
   int cam_x = 0;
   int cam_y = 0;
+  int dir_y = 1;
   char attributes = 0;
   unsigned char metasprite[]={
     0, 0, TILE+0, ATTR,
@@ -139,16 +140,16 @@ void main(void) {
 
   // write text to name table
   // Used to set "Static" Tiles for map creation.
-  vram_adr(NTADR_A(1,-31));		// set address
+  vram_adr(NTADR_C(1,0));		// set address
   vram_write("This is", 7);	// write bytes to video RAM
-  vram_adr(NTADR_A(1,-30));
+  vram_adr(NTADR_C(1,1));
   vram_write("Ethan Brown's", 13);
-  vram_adr(NTADR_A(1, -29));
+  vram_adr(NTADR_C(1, 2));
   vram_write("First NES 'Game'!", 18);
-  vram_adr(NTADR_A(29, -15));
+  vram_adr(NTADR_C(29, 17));
   vram_put('\xc4');
   vram_put('\xc6');
-  vram_adr(NTADR_A(29, -14));
+  vram_adr(NTADR_C(29, 18));
   vram_put('\xc5');
   vram_put('\xc7');
   vram_put(' ');
@@ -164,8 +165,6 @@ void main(void) {
   vrambuf_clear();
   set_vram_update(updbuf);
   
-  bank_bg(0);
-  
   // infinite loop
   while (1)
   {
@@ -173,7 +172,7 @@ void main(void) {
       
     handle_pad(&player_x, &player_y, &cam_x, &cam_y);
     
-    cur_oam = oam_meta_spr(player_x, player_y, attributes, metasprite); 
+    oam_meta_spr(player_x, player_y, attributes, metasprite); 
     
     vrambuf_flush();
     
