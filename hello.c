@@ -1,3 +1,5 @@
+
+//#link "potential.s"
 /*
 A simple "hello world" example.
 Set the screen background color and palette colors.
@@ -204,6 +206,8 @@ void main(void) {
   pal_col(18, 0x2d);
   pal_col(19, 0x32);
   
+  bank_bg(0);
+  
   vram_adr(NTADR_A(0, 0));
   vram_unrle(nametable);
   
@@ -211,10 +215,13 @@ void main(void) {
   vram_unrle(nametable2);
   
   // enable PPU rendering (turn on screen)
-  ppu_on_all();
+  
+  oam_clear();
   
   vrambuf_clear();
   set_vram_update(updbuf);
+  
+  ppu_on_all();
   
   // infinite loop
   while (1)
