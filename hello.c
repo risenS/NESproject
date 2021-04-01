@@ -93,45 +93,59 @@ const unsigned char nametable2[513]={
 ///// METASPRITES
 #define TILE 0xE0
 #define ATTR 0
+#define ACCELERATION 1
+#define MAX_VEL 2
 
-void handle_pad(int* pos_x, int* pos_y, int* cam_x, int* cam_y)
+struct player_attr
+  {
+  short pos_x;
+  short pos_y;
+  short vel_x;
+  short vel_y;
+  short cam_x;
+  short cam_y;
+  };
+
+void handle_pad(struct player_attr* player)
  {
   char pad_result = pad_poll(0);
-  
-  
-  if(*cam_y < 0 && *pos_y == 100)
-      *cam_y += 2;
-    else
-    {
-      if(*pos_y + 64 < 240)
-        *pos_y += 2;
-    }
+ 
   
   if(pad_result & PAD_RIGHT)
     {
-      if(*cam_x < 8 && *pos_x == 120)
-        *cam_x += 1;
-      else
+     if(player->cam_x < 8 && player->pos_x > 120)
       {
-        if(*pos_x + 8 < 240)
-          *pos_x += 1;
+        player->cam_x += 1;
       }
+      else if(player->pos_x < 232)
+        player->pos_x += 1;
     }
   if(pad_result & PAD_LEFT)
     {
-      if(*cam_x > -8 && *pos_x == 120)
-      	*cam_x -= 1;
-      else
+     if(player->cam_x > -8 && player->pos_x < 120)
       {
-        if(*pos_x - 8 > 0)
-          *pos_x -= 1;
+        player->cam_x -= 1;
       }
+      else if(player->pos_x > 8)
+        player->pos_x -= 1;
     }
   if(pad_result & PAD_DOWN)
     {
+      if(player->cam_y < 256 && player->pos_y > 100)
+      {
+        player->cam_y += 1;
+      }
+      else if(player->pos_y < 160)
+        player->pos_y += 1;
     }
   if(pad_result & PAD_UP)
     {
+      if(player->cam_y > 0 && player->pos_y < 100)
+      {
+          player->cam_y -= 1;    
+      }
+      else if(player->pos_y > 48)
+        player->pos_y -= 1;
     }
   if(pad_result & PAD_START)
     {
@@ -144,24 +158,16 @@ void handle_pad(int* pos_x, int* pos_y, int* cam_x, int* cam_y)
     }
   if(pad_result & PAD_A)
     {
-    	if(*cam_y > -232 && *pos_y == 100)
-    	  *cam_y -= 4;
-    	else
-    	{
-    	  if(*pos_y > 8)
-    	    *pos_y -= 4;
-    	}
+    	player->vel_y -= ACCELERATION * 2;
     }
   return;
  }
 
 // main function, run after console reset
 void main(void) {
-  int player_x = 120;
-  int player_y = 100;
-  int cam_x = 0;
-  int cam_y = 0;
-  int dir_y = 1;
+  
+  struct player_attr p1 = {120, 100, 0, 0, 0, 256};
+  
   char attributes = 0;
   
   unsigned char metasprite[]={
@@ -192,14 +198,14 @@ void main(void) {
   
   bank_bg(0);
   
-  vram_adr(NTADR_A(0, 0));
-  vram_unrle(nametable);
-  
-  vram_adr(NTADR_C(0, 6));
+  vram_adr(NTADR_A(0, 6));
   vram_unrle(nametable2);
   
+  vram_adr(NTADR_C(0, 0));
+  vram_unrle(nametable);
+  
   vram_adr(NTADR_A(0, 24));
-  vram_fill(0xEE, 128);
+  //vram_fill(0xEE, 128);
   
   // enable PPU rendering (turn on screen)
   
@@ -215,13 +221,13 @@ void main(void) {
   {
     char cur_oam = 0;
       
-    handle_pad(&player_x, &player_y, &cam_x, &cam_y);
+    handle_pad(&p1);
     
     bank_spr(1);
-    oam_meta_spr(player_x, player_y, attributes, metasprite); 
+    oam_meta_spr(p1.pos_x, p1.pos_y, attributes, metasprite); 
     
     vrambuf_flush();
     
-    scroll(cam_x, cam_y);
+    scroll(p1.cam_x, p1.cam_y);
   }
 }
