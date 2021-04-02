@@ -117,7 +117,7 @@ void handle_pad(struct player_attr* player)
       {
         player->cam_x += 1;
       }
-      else if(player->pos_x < 232)
+      else if(player->pos_x < 240)
         player->pos_x += 1;
     }
   if(pad_result & PAD_LEFT)
@@ -171,20 +171,24 @@ void main(void) {
   char attributes = 0;
   
   unsigned char metasprite[]={
-    0, 0, TILE+0, ATTR,
+    0, 0, TILE, ATTR,
     0, 8, TILE+16, ATTR,
+    8, 0, TILE+1, ATTR,
+    8, 8, TILE+17, ATTR,
     128};
   
   unsigned char metasprite2[]={
-    8, 0, TILE+0, 0x40,
-    8, 8, TILE+1, 0x40,
+    0, 0, TILE, ATTR,
+    0, 8, TILE+16, ATTR,
+    8, 0, TILE+1, 0x40,
+    8, 8, TILE+17, 0x40,
     128};
   
   // set palette colors.
   pal_col(0,0x0F);	
   pal_col(1,0x0C);	
   pal_col(2,0x2E);	
-  pal_col(3,0x06);
+  pal_col(3,0x04);
   
   // Character palette colors.
   pal_col(17, 0x0d);
