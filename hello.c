@@ -91,7 +91,7 @@ const unsigned char nametable2[513]={
 //#link "vrambuf.c"
 
 ///// METASPRITES
-#define TILE 0xE0
+#define TILE 0x20
 #define ATTR 0
 #define ACCELERATION 1
 #define MAX_VEL 2
@@ -172,16 +172,12 @@ void main(void) {
   
   unsigned char metasprite[]={
     0, 0, TILE+0, ATTR,
-    0, 8, TILE+1, ATTR,
-    8, 0, TILE+2, ATTR,
-    8, 8, TILE+3, ATTR,
+    0, 8, TILE+16, ATTR,
     128};
   
   unsigned char metasprite2[]={
     8, 0, TILE+0, 0x40,
     8, 8, TILE+1, 0x40,
-    0, 0, TILE+2, 0x40,
-    0, 8, TILE+3, 0x40,
     128};
   
   // set palette colors.
@@ -192,8 +188,8 @@ void main(void) {
   
   // Character palette colors.
   pal_col(17, 0x0d);
-  pal_col(18, 0x37);
-  pal_col(19, 0x17);
+  pal_col(18, 0x36);
+  pal_col(19, 0x28);
   //pal_col(20, 0x19);
   
   bank_bg(0);
