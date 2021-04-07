@@ -90,11 +90,112 @@ const unsigned char nametable2[513]={
 //#link "potential.s"
 //#link "vrambuf.c"
 
-///// METASPRITES
-#define TILE 0x20
-#define ATTR 0
+// define a 2x2 metasprite
+#define DEF_METASPRITE_2X2(name,code,pal)\
+const unsigned char name[]={\
+        0,      0,      (code)+0,   pal, \
+        0,      8,      (code)+16,   pal, \
+        8,      0,      (code)+1,   pal, \
+        8,      8,      (code)+17,   pal, \
+        128};
+
+// define a 2x2 metasprite, flipped horizontally
+#define DEF_METASPRITE_2X2_FLIP(name,code,pal)\
+const unsigned char name[]={\
+        8,      0,      (code)+0,   (pal)|OAM_FLIP_H, \
+        8,      8,      (code)+16,   (pal)|OAM_FLIP_H, \
+        0,      0,      (code)+1,   (pal)|OAM_FLIP_H, \
+        0,      8,      (code)+17,   (pal)|OAM_FLIP_H, \
+        128};
+
+#define DEF_METASPRITE_2X1(name,code,pal)\
+const unsigned char name[]={\
+	0,	0,	(code)+0,   pal,\
+        0,	8,	(code)+16,  pal,\
+        128};
+
+#define DEF_METASPRITE_2X1_FLIP(name,code,pal)\
+const unsigned char name[]={\
+	0,	0,	(code)+0,   (pal)|OAM_FLIP_H,\
+        0,	8,	(code)+16,  (pal)|OAM_FLIP_H,\
+        128};
+
 #define ACCELERATION 1
 #define MAX_VEL 2
+#define PLAYER_Y_MIN 48
+#define PLAYER_Y_MAX 160
+#define PLAYER_X_MIN 8
+#define PLAYER_X_MAX 240
+#define CAM_X_MIN -8
+#define CAM_X_MAX 8
+#define CAM_Y_MIN 0
+#define CAM_Y_MAX 256
+
+typedef enum ActorState
+{
+  STANDING, RUNNING, JUMPING, FALLING, ATTACKING
+};
+
+DEF_METASPRITE_2X1(playerRunR0, 0x00, 0);
+DEF_METASPRITE_2X1(playerRunR1, 0x01, 0);
+DEF_METASPRITE_2X1(playerRunR2, 0x02, 0);
+DEF_METASPRITE_2X1(playerRunR3, 0x03, 0);
+DEF_METASPRITE_2X1(playerRunR4, 0x04, 0);
+DEF_METASPRITE_2X1(playerRunR5, 0x05, 0);
+
+DEF_METASPRITE_2X1_FLIP(playerRunL0, 0x00, 0);
+DEF_METASPRITE_2X1_FLIP(playerRunL1, 0x01, 0);
+DEF_METASPRITE_2X1_FLIP(playerRunL2, 0x02, 0);
+DEF_METASPRITE_2X1_FLIP(playerRunL3, 0x03, 0);
+DEF_METASPRITE_2X1_FLIP(playerRunL4, 0x04, 0);
+DEF_METASPRITE_2X1_FLIP(playerRunL5, 0x05, 0);
+
+DEF_METASPRITE_2X1(playerJumpR0, 0x06, 0);
+DEF_METASPRITE_2X1(playerJumpR1, 0x07, 0);
+DEF_METASPRITE_2X1(playerJumpR2, 0x08, 0);
+DEF_METASPRITE_2X1(playerJumpR3, 0x09, 0);
+
+DEF_METASPRITE_2X1_FLIP(playerJumpL0, 0x06, 0);
+DEF_METASPRITE_2X1_FLIP(playerJumpL1, 0x07, 0);
+DEF_METASPRITE_2X1_FLIP(playerJumpL2, 0x08, 0);
+DEF_METASPRITE_2X1_FLIP(playerJumpL3, 0x09, 0);
+
+DEF_METASPRITE_2X2(playerSwingR0, 0x20, 0);
+DEF_METASPRITE_2X2(playerSwingR1, 0x22, 0);
+DEF_METASPRITE_2X2(playerSwingR2, 0x24, 0);
+DEF_METASPRITE_2X2(playerSwingR3, 0x26, 0);
+DEF_METASPRITE_2X2(playerSwingR4, 0x28, 0);
+
+DEF_METASPRITE_2X2_FLIP(playerSwingL0, 0x20, 0);
+DEF_METASPRITE_2X2_FLIP(playerSwingL1, 0x22, 0);
+DEF_METASPRITE_2X2_FLIP(playerSwingL2, 0x24, 0);
+DEF_METASPRITE_2X2_FLIP(playerSwingL3, 0x26, 0);
+DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
+
+int anim_number = 0;
+
+const unsigned char* const playerRunning[24] = 
+{
+  playerRunR0, playerRunR1, playerRunR2, playerRunR3,
+  playerRunR4, playerRunR5, playerRunR0, playerRunR1, playerRunR2, playerRunR3,
+  playerRunR4, playerRunR5,
+  playerRunL0, playerRunL1, playerRunL2, playerRunL3,
+  playerRunL4, playerRunL5, playerRunL0, playerRunL1, playerRunL2, playerRunL3,
+  playerRunL4, playerRunL5
+};
+
+const unsigned char* const playerJumping[8] = 
+{
+  playerJumpR0, playerJumpR1, playerJumpR2, playerJumpR3,
+  playerJumpL0, playerJumpL1, playerJumpL2, playerJumpL3
+};
+
+const unsigned char* const playerSwinging[10] =
+{
+  playerSwingR0, playerSwingR1, playerSwingR2,
+  playerSwingR3, playerSwingR4, playerSwingL0, playerSwingL1, 
+  playerSwingL2, playerSwingL3, playerSwingL4
+};
 
 struct player_attr
   {
@@ -104,48 +205,108 @@ struct player_attr
   short vel_y;
   short cam_x;
   short cam_y;
+  short dir;
+  byte state;
+  const unsigned char* meta;
   };
+
+void add_velocity(struct player_attr* player)
+{
+  if(player->cam_x > CAM_X_MIN && player->pos_x == 120 && player->cam_x < CAM_X_MAX)
+      {
+        player->cam_x += player->vel_x;
+      }
+  else if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
+        player->pos_x += player->vel_x;
+  
+  if(player->cam_y < CAM_Y_MAX && player->pos_y == 100 && player->cam_y > CAM_Y_MIN)
+      {
+        player->cam_y += player->vel_y;
+      }
+  else if(player->pos_y < PLAYER_Y_MAX && player->pos_y > PLAYER_Y_MIN)
+        player->pos_y += player->vel_y;
+}
 
 void handle_pad(struct player_attr* player)
  {
   char pad_result = pad_poll(0);
- 
   
+  player->vel_x = 0;
+  if(player->vel_y < 2 && player->state != JUMPING)
+  {
+    if(player->pos_y <= PLAYER_Y_MIN)
+       player->pos_y = PLAYER_Y_MIN + 1;
+    if(player->cam_y <= CAM_Y_MIN)
+       player->cam_y = CAM_Y_MIN + 1;
+    
+    player->vel_y += 1;
+  }
+    
   if(pad_result & PAD_RIGHT)
     {
-     if(player->cam_x < 8 && player->pos_x > 120)
-      {
-        player->cam_x += 1;
-      }
-      else if(player->pos_x < 240)
-        player->pos_x += 1;
+     if(player->pos_x <= PLAYER_X_MIN)
+       player->pos_x = PLAYER_X_MIN + 1;
+     if(player->cam_x <= CAM_X_MIN)
+       player->cam_x = CAM_X_MIN + 1;
+    
+     if(player->state != JUMPING && player->state != FALLING)
+       player->state = RUNNING;
+     player->dir = 1;
+     player->vel_x = 1;
+     //if(player->cam_x < 8 && player->pos_x > 120)
+     // {
+     //   player->cam_x += 1;
+     // }
+     // else if(player->pos_x < 240)
+     //   player->pos_x += 1;
     }
   if(pad_result & PAD_LEFT)
     {
-     if(player->cam_x > -8 && player->pos_x < 120)
-      {
-        player->cam_x -= 1;
-      }
-      else if(player->pos_x > 8)
-        player->pos_x -= 1;
+     if(player->pos_x >= PLAYER_X_MAX)
+       player->pos_x = PLAYER_X_MAX - 1;
+     if(player->cam_x >= CAM_X_MAX)
+       player->cam_x = CAM_X_MAX - 1;
+    
+     if(player->state != JUMPING && player->state != FALLING)
+       player->state = RUNNING;
+     player->dir = 0;
+     player->vel_x = -1;
+     //if(player->cam_x > -8 && player->pos_x < 120)
+     // {
+     //   player->cam_x -= 1;
+     // }
+     // else if(player->pos_x > 8)
+     //   player->pos_x -= 1;
     }
   if(pad_result & PAD_DOWN)
     {
-      if(player->cam_y < 256 && player->pos_y > 100)
-      {
-        player->cam_y += 1;
-      }
-      else if(player->pos_y < 160)
-        player->pos_y += 1;
+     if(player->pos_y <= PLAYER_Y_MIN)
+       player->pos_y = PLAYER_Y_MIN + 1;
+     if(player->cam_y <= CAM_Y_MIN)
+       player->cam_y = CAM_Y_MIN + 1;
+    
+     player->vel_y = 1;
+      //if(player->cam_y < 256 && player->pos_y > 100)
+      //{
+      //  player->cam_y += 1;
+      //}
+      //else if(player->pos_y < 160)
+      //  player->pos_y += 1;
     }
   if(pad_result & PAD_UP)
     {
-      if(player->cam_y > 0 && player->pos_y < 100)
-      {
-          player->cam_y -= 1;    
-      }
-      else if(player->pos_y > 48)
-        player->pos_y -= 1;
+     if(player->pos_y >= PLAYER_Y_MAX)
+       player->pos_y = PLAYER_Y_MAX - 1;
+     if(player->cam_y >= CAM_Y_MAX)
+       player->cam_y = CAM_Y_MAX - 1;
+    
+     player->vel_y = -1;
+      //if(player->cam_y > 0 && player->pos_y < 100)
+      //{
+      //    player->cam_y -= 1;    
+      //}
+      //else if(player->pos_y > 48)
+      //  player->pos_y -= 1;
     }
   if(pad_result & PAD_START)
     {
@@ -155,34 +316,88 @@ void handle_pad(struct player_attr* player)
     }
   if(pad_result & PAD_B)
     {
+    	player->state = ATTACKING;
     }
   if(pad_result & PAD_A)
     {
-    	player->vel_y -= ACCELERATION * 2;
+      if(player->pos_y >= PLAYER_Y_MAX)
+       player->pos_y = PLAYER_Y_MAX - 1;
+      if(player->cam_y >= CAM_Y_MAX)
+       player->cam_y = CAM_Y_MAX - 1;  
+    
+      if(player->state != JUMPING && player->state != FALLING)
+      {
+    	player->state = JUMPING;
+	
+        player->vel_y = -5;
+      }
     }
+  
+  add_velocity(player);
+  
   return;
  }
+
+void handle_anim(struct player_attr* player)
+{
+  if(player->vel_x == 0)
+    player->state = STANDING;
+  
+  switch(player->state)
+  {
+    case STANDING:
+    	player->meta = playerSwinging[0 + (player->dir?0:5)];
+    	break;
+    case RUNNING:
+        player->meta = playerRunning[((player->pos_x >> 1) & 11) + (player->dir?0:12)];
+        break;
+    case ATTACKING:
+      if(nesclock()%5 == 0)
+    	{
+      	anim_number++;
+        anim_number = anim_number % 5;
+    	player->meta = playerSwinging[anim_number + (player->dir?0:5)];
+          if(anim_number == 4)
+          {
+            player->state = STANDING;
+            anim_number = 0;
+            player->meta = playerSwinging[0];
+          }
+    	}
+      break;
+    case JUMPING:
+      if(nesclock()%10 == 0)
+      {
+        anim_number++;
+        anim_number = anim_number % 2;
+        player->meta = playerJumping[anim_number + (player->dir?0:4)];
+        if(anim_number == 1)
+        {
+          player->state = FALLING;
+        }
+      }
+      break;
+    case FALLING:
+      if(nesclock()%10 == 0)
+      {
+        anim_number++;
+        anim_number = anim_number % 4;
+        player->meta = playerJumping[anim_number + (player->dir?0:4)];
+        if(anim_number == 3)
+        {
+          player->state = STANDING;
+          anim_number = 0;
+        }
+      }
+  }
+}
 
 // main function, run after console reset
 void main(void) {
   
-  struct player_attr p1 = {120, 100, 0, 0, 0, 256};
+  struct player_attr p1 = {120, 100, 0, 0, 0, 256, 0, STANDING};
   
   char attributes = 0;
-  
-  unsigned char metasprite[]={
-    0, 0, TILE, ATTR,
-    0, 8, TILE+16, ATTR,
-    8, 0, TILE+1, ATTR,
-    8, 8, TILE+17, ATTR,
-    128};
-  
-  unsigned char metasprite2[]={
-    0, 0, TILE, ATTR,
-    0, 8, TILE+16, ATTR,
-    8, 0, TILE+1, 0x40,
-    8, 8, TILE+17, 0x40,
-    128};
   
   // set palette colors.
   pal_col(0,0x0F);	
@@ -219,12 +434,15 @@ void main(void) {
   // infinite loop
   while (1)
   {
+    const unsigned char* meta = 0;
     char cur_oam = 0;
       
     handle_pad(&p1);
     
+    handle_anim(&p1);
+      
     bank_spr(1);
-    oam_meta_spr(p1.pos_x, p1.pos_y, attributes, metasprite); 
+    oam_meta_spr(p1.pos_x, p1.pos_y, attributes, p1.meta); 
     
     vrambuf_flush();
     
