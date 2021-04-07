@@ -232,7 +232,7 @@ void handle_pad(struct player_attr* player)
   char pad_result = pad_poll(0);
   
   player->vel_x = 0;
-  if(player->vel_y < 2 && player->state != JUMPING)
+  if(player->vel_y < 2 && player->state == FALLING)
   {
     if(player->pos_y <= PLAYER_Y_MIN)
        player->pos_y = PLAYER_Y_MIN + 1;
@@ -240,6 +240,10 @@ void handle_pad(struct player_attr* player)
        player->cam_y = CAM_Y_MIN + 1;
     
     player->vel_y += 1;
+  }
+  else if(player->pos_y >= PLAYER_Y_MAX - 1 && player->state != ATTACKING)
+  {
+    player->state = STANDING;
   }
     
   if(pad_result & PAD_RIGHT)
@@ -325,7 +329,7 @@ void handle_pad(struct player_attr* player)
       if(player->cam_y >= CAM_Y_MAX)
        player->cam_y = CAM_Y_MAX - 1;  
     
-      if(player->state != JUMPING && player->state != FALLING)
+      if(player->state == STANDING || player->state == RUNNING)
       {
     	player->state = JUMPING;
 	
@@ -339,10 +343,7 @@ void handle_pad(struct player_attr* player)
  }
 
 void handle_anim(struct player_attr* player)
-{
-  if(player->vel_x == 0)
-    player->state = STANDING;
-  
+{ 
   switch(player->state)
   {
     case STANDING:
@@ -364,31 +365,31 @@ void handle_anim(struct player_attr* player)
             player->meta = playerSwinging[0];
           }
     	}
-      break;
+        break;
     case JUMPING:
-      if(nesclock()%10 == 0)
-      {
-        anim_number++;
-        anim_number = anim_number % 2;
-        player->meta = playerJumping[anim_number + (player->dir?0:4)];
-        if(anim_number == 1)
+        if(nesclock()%10 == 0)
         {
-          player->state = FALLING;
+          anim_number++;
+          anim_number = anim_number % 2;
+          player->meta = playerJumping[anim_number + (player->dir?0:4)];
+          if(anim_number == 1)
+          {
+            player->state = FALLING;
+          }
         }
-      }
-      break;
+        break;
     case FALLING:
-      if(nesclock()%10 == 0)
-      {
-        anim_number++;
-        anim_number = anim_number % 4;
-        player->meta = playerJumping[anim_number + (player->dir?0:4)];
-        if(anim_number == 3)
+        if(nesclock()%10 == 0)
         {
-          player->state = STANDING;
-          anim_number = 0;
+          anim_number++;
+          anim_number = anim_number % 4;
+          player->meta = playerJumping[anim_number + (player->dir?0:4)];
+          if(anim_number == 3)
+          {
+            anim_number = 0;
+          }
         }
-      }
+        break;
   }
 }
 
