@@ -123,13 +123,11 @@ const unsigned char name[]={\
 #define ACCELERATION 1
 #define MAX_VEL 2
 #define PLAYER_Y_MIN 48
-#define PLAYER_Y_MAX 160
+#define PLAYER_Y_MAX 208
 #define PLAYER_X_MIN 8
 #define PLAYER_X_MAX 240
-#define CAM_X_MIN -8
-#define CAM_X_MAX 8
-#define CAM_Y_MIN 0
-#define CAM_Y_MAX 256
+#define CAM_Y_MIN 48
+#define CAM_Y_MAX 302
 
 typedef enum ActorState
 {
@@ -212,14 +210,10 @@ struct player_attr
 
 void add_velocity(struct player_attr* player)
 {
-  if(player->cam_x > CAM_X_MIN && player->pos_x == 120 && player->cam_x < CAM_X_MAX)
-      {
-        player->cam_x += player->vel_x;
-      }
-  else if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
+  if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
         player->pos_x += player->vel_x;
   
-  if(player->cam_y < CAM_Y_MAX && player->pos_y == 100 && player->cam_y > CAM_Y_MIN)
+  if(player->cam_y < CAM_Y_MAX && player->pos_y == 120 && player->cam_y > CAM_Y_MIN && player->vel_y < 0)
       {
         player->cam_y += player->vel_y;
       }
@@ -250,37 +244,21 @@ void handle_pad(struct player_attr* player)
     {
      if(player->pos_x <= PLAYER_X_MIN)
        player->pos_x = PLAYER_X_MIN + 1;
-     if(player->cam_x <= CAM_X_MIN)
-       player->cam_x = CAM_X_MIN + 1;
     
      if(player->state != JUMPING && player->state != FALLING)
        player->state = RUNNING;
      player->dir = 1;
      player->vel_x = 1;
-     //if(player->cam_x < 8 && player->pos_x > 120)
-     // {
-     //   player->cam_x += 1;
-     // }
-     // else if(player->pos_x < 240)
-     //   player->pos_x += 1;
     }
   if(pad_result & PAD_LEFT)
     {
      if(player->pos_x >= PLAYER_X_MAX)
        player->pos_x = PLAYER_X_MAX - 1;
-     if(player->cam_x >= CAM_X_MAX)
-       player->cam_x = CAM_X_MAX - 1;
     
      if(player->state != JUMPING && player->state != FALLING)
        player->state = RUNNING;
      player->dir = 0;
      player->vel_x = -1;
-     //if(player->cam_x > -8 && player->pos_x < 120)
-     // {
-     //   player->cam_x -= 1;
-     // }
-     // else if(player->pos_x > 8)
-     //   player->pos_x -= 1;
     }
   if(pad_result & PAD_DOWN)
     {
@@ -290,12 +268,6 @@ void handle_pad(struct player_attr* player)
        player->cam_y = CAM_Y_MIN + 1;
     
      player->vel_y = 1;
-      //if(player->cam_y < 256 && player->pos_y > 100)
-      //{
-      //  player->cam_y += 1;
-      //}
-      //else if(player->pos_y < 160)
-      //  player->pos_y += 1;
     }
   if(pad_result & PAD_UP)
     {
@@ -305,12 +277,6 @@ void handle_pad(struct player_attr* player)
        player->cam_y = CAM_Y_MAX - 1;
     
      player->vel_y = -1;
-      //if(player->cam_y > 0 && player->pos_y < 100)
-      //{
-      //    player->cam_y -= 1;    
-      //}
-      //else if(player->pos_y > 48)
-      //  player->pos_y -= 1;
     }
   if(pad_result & PAD_START)
     {
@@ -353,6 +319,10 @@ void handle_anim(struct player_attr* player)
         player->meta = playerRunning[((player->pos_x >> 1) & 11) + (player->dir?0:12)];
         break;
     case ATTACKING:
+      if(player->dir)
+      	player->pos_x += 2;
+      else
+        player->pos_x -= 2;
       if(nesclock()%5 == 0)
     	{
       	anim_number++;
@@ -396,7 +366,7 @@ void handle_anim(struct player_attr* player)
 // main function, run after console reset
 void main(void) {
   
-  struct player_attr p1 = {120, 100, 0, 0, 0, 256, 0, STANDING};
+  struct player_attr p1 = {120, 100, 0, 0, 0, 256, 0, FALLING};
   
   char attributes = 0;
   
@@ -420,15 +390,71 @@ void main(void) {
   vram_adr(NTADR_C(0, 0));
   vram_unrle(nametable);
   
-  vram_adr(NTADR_A(0, 24));
-  //vram_fill(0xEE, 128);
+  vram_adr(NTADR_A(0, 0));
+  vram_fill(0x51, 32);
+  vram_fill(0xB4, 128);
+  vram_adr(NTADR_A(0, 5));
+  vram_fill(0x60, 32);
+    
+  ////// HEALTH /////////////
+  vram_adr(NTADR_A(1, 1));
+  vram_put(0x50);
+  vram_fill(0x51, 12);
+  vram_put(0x52);
+  vram_adr(NTADR_A(2, 2));
+  vram_put(0x7b);
+  vram_put(0x83);
+  vram_put(0xac);
+  vram_adr(NTADR_A(1, 4));
+  vram_put(0x5F);
+  vram_fill(0x60, 12);
+  vram_put(0x61);
+  vram_adr(NTADR_A(1, 2));
+  vram_put(0x53);
+  vram_adr(NTADR_A(1, 3));
+  vram_put(0x53);
+  //////////////////////////
+  
+  ////// CONNECTOR /////////
+  vram_adr(NTADR_A(15, 3));
+  vram_fill(0x60, 3);
+  vram_adr(NTADR_A(23, 3));
+  vram_fill(0x60, 3);
+  vram_adr(NTADR_A(15, 2));
+  vram_fill(0x51, 3);
+  vram_adr(NTADR_A(23, 2));
+  vram_fill(0x51, 3);
+  vram_adr(NTADR_A(18, 1));
+  vram_put(0x50);
+  vram_fill(0x51, 3);
+  vram_put(0x52);
+  vram_adr(NTADR_A(18, 4));
+  vram_put(0x5F);
+  vram_fill(0x60, 3);
+  vram_put(0x61);
+  ///////////////////////////
+  
+  ////// ITEM SLOT //////////
+  vram_adr(NTADR_A(26, 1));
+  vram_put(0x50);
+  vram_fill(0x51, 3);
+  vram_put(0x52);
+  vram_adr(NTADR_A(26, 4));
+  vram_put(0x5F);
+  vram_fill(0x60, 3);
+  vram_put(0x61);
+  vram_adr(NTADR_A(30, 2));
+  vram_put(0x62);
+  vram_adr(NTADR_A(30, 3));
+  vram_put(0x62);
+  ///////////////////////////
   
   // enable PPU rendering (turn on screen)
   
   oam_clear();
   
-  vrambuf_clear();
-  set_vram_update(updbuf);
+  //vrambuf_clear();
+  //set_vram_update(updbuf);
   
   ppu_on_all();
   
@@ -437,16 +463,15 @@ void main(void) {
   {
     const unsigned char* meta = 0;
     char cur_oam = 0;
-      
+    cur_oam = oam_spr(0, 46, 0x20, 0, cur_oam);
+    
     handle_pad(&p1);
     
     handle_anim(&p1);
       
     bank_spr(1);
-    oam_meta_spr(p1.pos_x, p1.pos_y, attributes, p1.meta); 
+    cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta); 
     
-    vrambuf_flush();
-    
-    scroll(p1.cam_x, p1.cam_y);
+    splitxy(0, p1.cam_y % 480);
   }
 }
