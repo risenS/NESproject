@@ -10,7 +10,6 @@ Finally, turn on the PPU to display video.
 #include "bcd.h"
 
 
-
 const unsigned char nametable[514]={
 0x03,0x17,0x03,0x08,0x18,0x2f,0x2f,0x0b,0x0b,0x2f,0x2f,0x1b,0x2f,0x1b,0x2f,0x2f,
 0x1b,0x2f,0x03,0x04,0x06,0x17,0x03,0x0c,0x18,0x2f,0x2f,0x0b,0x0b,0x2f,0x2f,0x1b,
@@ -172,6 +171,12 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 
 int anim_number = 0;
 
+
+// Set first 3 rows to be collideable tiles, this will remove for loop every frame.
+const unsigned char collideables[31] = {0x6c, 0x6D, 0x6E, 0x04, 0x01, 0x44, 0x45, 0x46, 0x47, 0x11,
+                                  0x14, 0x06, 0x07, 0x08, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+                                  0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x4E, 0x4F, 0x2C, 0x39, 0x1E};
+
 const unsigned char* const playerRunning[24] = 
 {
   playerRunR0, playerRunR1, playerRunR2, playerRunR3,
@@ -221,12 +226,39 @@ void add_velocity(struct player_attr* player)
         player->pos_y += player->vel_y;
 }
 
+void handle_collision(struct player_attr* player)
+{
+  unsigned char cur_tile;
+  bool is_in = false;
+  //int i;
+  int tile_x = (player->pos_x / 8);
+  int tile_y = (player->pos_y / 8);
+  tile_x += 1;
+  tile_y -= 2;
+  
+  vram_adr(NTADR_C(tile_x, tile_y));
+  vram_read(&cur_tile, 1);
+  
+  //for(i=0;i<23;i++)
+  //{
+  //  if(collideables[i]==cur_tile)
+  //    is_in = true;
+  //}
+  
+  if(player->pos_y > 200 && player->vel_y < 2)
+  {
+    player->pos_y -= 1;
+    player->state = STANDING;
+  }
+  vram_adr(0);
+}
+
 void handle_pad(struct player_attr* player)
  {
   char pad_result = pad_poll(0);
   
   player->vel_x = 0;
-  if(player->vel_y < 2 && player->state == FALLING)
+  if(player->vel_y < 1 && player->state == FALLING)
   {
     if(player->pos_y <= PLAYER_Y_MIN)
        player->pos_y = PLAYER_Y_MIN + 1;
@@ -320,10 +352,10 @@ void handle_anim(struct player_attr* player)
         break;
     case ATTACKING:
       if(player->dir)
-      	player->pos_x += 2;
+      	player->vel_x = 2;
       else
-        player->pos_x -= 2;
-      if(nesclock()%5 == 0)
+        player->vel_x = -2;
+      if(nesclock()%10 == 0)
     	{
       	anim_number++;
         anim_number = anim_number % 5;
@@ -363,7 +395,7 @@ void handle_anim(struct player_attr* player)
   }
 }
 
-// main function, run after console reset
+////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
   
   struct player_attr p1 = {120, 100, 0, 0, 0, 256, 0, FALLING};
@@ -405,6 +437,7 @@ void main(void) {
   vram_put(0x7b);
   vram_put(0x83);
   vram_put(0xac);
+  vram_fill(0x6a, 3);
   vram_adr(NTADR_A(1, 4));
   vram_put(0x5F);
   vram_fill(0x60, 12);
@@ -453,8 +486,8 @@ void main(void) {
   
   oam_clear();
   
-  //vrambuf_clear();
-  //set_vram_update(updbuf);
+  vrambuf_clear();
+  set_vram_update(updbuf);
   
   ppu_on_all();
   
@@ -472,6 +505,11 @@ void main(void) {
     bank_spr(1);
     cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta); 
     
-    splitxy(0, p1.cam_y % 480);
+    splitxy(0, p1.cam_y % 479);
+    
+    
+    ppu_wait_nmi();
+    handle_collision(&p1);
+    vrambuf_clear();  
   }
 }
