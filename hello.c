@@ -8,6 +8,7 @@ Finally, turn on the PPU to display video.
 #include "neslib.h"
 #include "vrambuf.h"
 #include "bcd.h"
+#include "apu.h"
 
 
 const unsigned char nametable2[514]={
@@ -101,6 +102,7 @@ const unsigned char nametable[668]={
 // link the pattern table into CHR ROM
 //#link "potential.s"
 //#link "vrambuf.c"
+//#link "apu.c"
 
 // define a 2x2 metasprite
 #define DEF_METASPRITE_2X2(name,code,pal)\
@@ -183,7 +185,7 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL3, 0x26, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 
 int anim_number = 0;
-
+int anim_loop = 0;
 
 // Set first 3 rows to be collideable tiles, this will remove for loop every frame.
 const unsigned char collideables[31] = {0x6c, 0x6D, 0x6E, 0x04, 0x01, 0x44, 0x45, 0x46, 0x47, 0x11,
@@ -259,15 +261,16 @@ void handle_collision(struct player_attr* player)
   vram_adr(NTADR_C(tile_x - 1, tile_y - 1));
   vram_read(&left_tile, 1);
   
-  if(bot_tile < 0x5f && bot_tile != 0x1C)
+  if(bot_tile < 0x5f && bot_tile != 0x1C && player->state != JUMPING)
   {
     player->pos_y -= 1;
     player->state = STANDING;
   }
-  if(top_tile < 0x5f && top_tile != 0x1C)
+  else if(player->state != JUMPING)
+    player->state = FALLING;
+  if(top_tile < 0x5f && top_tile != 0x1C && top_tile != 0x07)
   {
-    player->vel_y = 0;
-    player->pos_y += 1;
+    player->state = FALLING;
   }
   if(left_tile < 0x5f && left_tile != 0x1C)
   {
@@ -346,20 +349,15 @@ void handle_pad(struct player_attr* player)
     }
   if(pad_result & PAD_B)
     {
+    	APU_ENABLE(ENABLE_PULSE0);
+    	APU_PULSE_DECAY(PULSE_CH0, 1000, DUTY_50, 15, 30);
     	player->state = ATTACKING;
     }
   if(pad_result & PAD_A)
     {
-      if(player->pos_y >= PLAYER_Y_MAX)
-       player->pos_y = PLAYER_Y_MAX - 1;
-      if(player->cam_y >= CAM_Y_MAX)
-       player->cam_y = CAM_Y_MAX - 1;  
-    
       if(player->state == STANDING || player->state == RUNNING)
       {
     	player->state = JUMPING;
-	
-        player->vel_y = -5;
       }
     }
   
@@ -397,14 +395,17 @@ void handle_anim(struct player_attr* player)
     	}
         break;
     case JUMPING:
-        if(nesclock()%10 == 0)
+      	player->pos_y -= 2;
+        anim_loop++;
+        if(anim_loop%10 == 0)
         {
           anim_number++;
           anim_number = anim_number % 2;
           player->meta = playerJumping[anim_number + (player->dir?0:4)];
-          if(anim_number == 1)
+          if(anim_loop >= 25)
           {
             player->state = FALLING;
+            anim_loop = 0;
           }
         }
         break;
@@ -539,7 +540,8 @@ void main(void) {
     bank_spr(1);
     cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta);
     
-    splitxy(0, p1.cam_y % 479);
+    //splitxy(0, p1.cam_y % 479);
+    splitxy(0, 256);
     
     ppu_wait_nmi();
     handle_collision(&p1);    
