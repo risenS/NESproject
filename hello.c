@@ -108,7 +108,8 @@ struct level_data
   int portal_y;
 };
 
-struct level_data level_list[5] = {{nametable, 120, 100, 200, 20}, {nametable2, 32, 72, 200, 20}};
+#define LEVEL_COUNT 2
+struct level_data level_list[LEVEL_COUNT] = {{nametable, 120, 100, 200, 56}, {nametable2, 32, 72, 232, 164}};
 
 
 
@@ -202,6 +203,7 @@ int tens = 5;
 int ones = 5;
 int life_pos = 9;
 bool called = false;
+int cur_level = 0;
 
 // Set first 3 rows to be collideable tiles, this will remove for loop every frame.
 const unsigned char collideables[31] = {0x6c, 0x6D, 0x6E, 0x04, 0x01, 0x44, 0x45, 0x46, 0x47, 0x11,
@@ -492,21 +494,24 @@ void draw_status_info(int oam_num)
 }
 
 void load_level(struct level_data* level, struct player_attr* player)
-{
-  called = true;
-  
+{  
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
   
   ppu_off();
   vrambuf_clear();
   set_vram_update(updbuf);
-  hundreds += 2;
+  
+  // Give some extra time for reaching the next level
+  hundreds += 3;
+  
+  // Put the next stage into memory.
   pal_bright(0);
   vram_adr(NTADR_A(0, 6));
   vram_unrle(level->map);
   pal_bright(4);
   ppu_on_all();
+  
 }
 
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
@@ -614,7 +619,7 @@ void main(void) {
   vrambuf_clear();
   set_vram_update(updbuf);
   
-  load_level(&level_list[0], &p1);
+  load_level(&level_list[cur_level], &p1);
   
   ppu_on_all();
   
@@ -631,13 +636,19 @@ void main(void) {
       
     bank_spr(1);
     cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta);
+    cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
     
     
     splitxy(0, 48);
     
-    //if(p1.pos_x > 150)
-    //  load_level(&level_list[1], &p1);
-    
+    if((p1.pos_x + 8) > level_list[cur_level].portal_x && p1.pos_x < level_list[cur_level].portal_x + 8
+        && (p1.pos_y + 16) > level_list[cur_level].portal_y && p1.pos_y < level_list[cur_level].portal_x - 8)
+    {
+      if(cur_level < LEVEL_COUNT - 1)
+    	cur_level++;
+      load_level(&level_list[cur_level], &p1);
+    }
+      
     ppu_wait_nmi();
     handle_collision(&p1);    
     draw_status_info(cur_oam);
