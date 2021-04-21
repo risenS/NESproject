@@ -423,6 +423,12 @@ void handle_anim(struct player_attr* player)
   }
 }
 
+void draw_status_info(int oam_num)
+{
+  int cur_oam = oam_num;
+  cur_oam = oam_meta_spr(160, 16, cur_oam, playerSwinging[2]);
+}
+
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
   
@@ -437,7 +443,7 @@ void main(void) {
   pal_col(3,0x04);
   
   // Character palette colors.
-  pal_col(17, 0x0d);
+  pal_col(17, 0x06);
   pal_col(18, 0x36);
   pal_col(19, 0x28);
   //pal_col(20, 0x19);
@@ -451,63 +457,63 @@ void main(void) {
   vram_unrle(nametable);
   
   vram_adr(NTADR_A(0, 0));
-  vram_fill(0x51, 32);
-  vram_fill(0xB4, 128);
+  vram_fill(0xA9, 32);
+  vram_fill(0xA9, 128);
   vram_adr(NTADR_A(0, 5));
-  vram_fill(0x60, 32);
+  vram_fill(0xB9, 32);
     
   ////// HEALTH /////////////
   vram_adr(NTADR_A(1, 1));
-  vram_put(0x50);
-  vram_fill(0x51, 12);
-  vram_put(0x52);
+  vram_put(0x98);
+  vram_fill(0x99, 12);
+  vram_put(0x9A);
   vram_adr(NTADR_A(2, 2));
-  vram_put(0x7b);
-  vram_put(0x83);
-  vram_put(0xac);
-  vram_fill(0x6a, 3);
+  vram_put(0xC7);
+  vram_put(0xCF);
+  vram_put(0xF9);
+  vram_fill(0xAC, 3);
   vram_adr(NTADR_A(1, 4));
-  vram_put(0x5F);
-  vram_fill(0x60, 12);
-  vram_put(0x61);
+  vram_put(0xB8);
+  vram_fill(0xB9, 12);
+  vram_put(0xBA);
   vram_adr(NTADR_A(1, 2));
-  vram_put(0x53);
+  vram_put(0xA8);
   vram_adr(NTADR_A(1, 3));
-  vram_put(0x53);
+  vram_put(0xA8);
   //////////////////////////
   
   ////// CONNECTOR /////////
   vram_adr(NTADR_A(15, 3));
-  vram_fill(0x60, 3);
+  vram_fill(0xB9, 3);
   vram_adr(NTADR_A(23, 3));
-  vram_fill(0x60, 3);
+  vram_fill(0xB9, 3);
   vram_adr(NTADR_A(15, 2));
-  vram_fill(0x51, 3);
+  vram_fill(0x99, 3);
   vram_adr(NTADR_A(23, 2));
-  vram_fill(0x51, 3);
+  vram_fill(0x99, 3);
   vram_adr(NTADR_A(18, 1));
-  vram_put(0x50);
-  vram_fill(0x51, 3);
-  vram_put(0x52);
+  vram_put(0x98);
+  vram_fill(0x99, 3);
+  vram_put(0x9A);
   vram_adr(NTADR_A(18, 4));
-  vram_put(0x5F);
-  vram_fill(0x60, 3);
-  vram_put(0x61);
+  vram_put(0xB8);
+  vram_fill(0xB9, 3);
+  vram_put(0xBA);
   ///////////////////////////
   
   ////// ITEM SLOT //////////
   vram_adr(NTADR_A(26, 1));
-  vram_put(0x50);
-  vram_fill(0x51, 3);
-  vram_put(0x52);
+  vram_put(0x98);
+  vram_fill(0x99, 3);
+  vram_put(0x9A);
   vram_adr(NTADR_A(26, 4));
-  vram_put(0x5F);
-  vram_fill(0x60, 3);
-  vram_put(0x61);
+  vram_put(0xB8);
+  vram_fill(0xB9, 3);
+  vram_put(0xBA);
   vram_adr(NTADR_A(30, 2));
-  vram_put(0x62);
+  vram_put(0xAA);
   vram_adr(NTADR_A(30, 3));
-  vram_put(0x62);
+  vram_put(0xAA);
   ///////////////////////////
   
   // enable PPU rendering (turn on screen)
@@ -531,13 +537,13 @@ void main(void) {
     handle_anim(&p1);
       
     bank_spr(1);
-    cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta); 
+    cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta);
     
     splitxy(0, p1.cam_y % 479);
     
-    
     ppu_wait_nmi();
-    handle_collision(&p1);
+    handle_collision(&p1);    
+    draw_status_info(cur_oam);
     vrambuf_clear();  
   }
 }
