@@ -9,6 +9,42 @@ Finally, turn on the PPU to display video.
 #include "vrambuf.h"
 #include "bcd.h"
 #include "apu.h"
+// define a 2x2 metasprite
+#define DEF_METASPRITE_2X2(name,code,pal)\
+const unsigned char name[]={\
+        0,      0,      (code)+0,   pal, \
+        0,      8,      (code)+16,   pal, \
+        8,      0,      (code)+1,   pal, \
+        8,      8,      (code)+17,   pal, \
+        128};
+
+// define a 2x2 metasprite, flipped horizontally
+#define DEF_METASPRITE_2X2_FLIP(name,code,pal)\
+const unsigned char name[]={\
+        8,      0,      (code)+0,   (pal)|OAM_FLIP_H, \
+        8,      8,      (code)+16,   (pal)|OAM_FLIP_H, \
+        0,      0,      (code)+1,   (pal)|OAM_FLIP_H, \
+        0,      8,      (code)+17,   (pal)|OAM_FLIP_H, \
+        128};
+
+#define DEF_METASPRITE_2X1(name,code,pal)\
+const unsigned char name[]={\
+	0,	0,	(code)+0,   pal,\
+        0,	8,	(code)+16,  pal,\
+        128};
+
+#define DEF_METASPRITE_2X1_FLIP(name,code,pal)\
+const unsigned char name[]={\
+	0,	0,	(code)+0,   (pal)|OAM_FLIP_H,\
+        0,	8,	(code)+16,  (pal)|OAM_FLIP_H,\
+        128};
+
+#define PLAYER_Y_MIN 48
+#define PLAYER_Y_MAX 208
+#define PLAYER_X_MIN 8
+#define PLAYER_X_MAX 240
+#define ZERO_TILE 0xDA
+#define INVINCIBILITY_FRAMES 50
 
 const unsigned char nametable[668]={
 0x03,0x6e,0x6e,0x6f,0x63,0x64,0x65,0x03,0x02,0x60,0x61,0x62,0x1c,0x1c,0x8b,0x62,
@@ -98,10 +134,43 @@ const unsigned char nametable2[617]={
 0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x05,0x00
 };
 
+DEF_METASPRITE_2X2(snakeIdle, 0x40, 0);
 
+typedef enum ActorState
+{
+  STANDING, RUNNING, JUMPING, FALLING, ATTACKING
+};
+
+typedef enum ActorType
+{
+  PLAYER, SNAKE, OTHER
+};
+
+struct actor_attr
+  {
+  enum ActorType type;
+  short pos_x;
+  short pos_y;
+  short vel_x;
+  short vel_y;
+  short dir;
+  short life;
+  short invin;
+  byte state;
+  const unsigned char* meta;
+  };
+
+
+struct actor_attr snake = {SNAKE, 100, 100, 0, 0, 1, 1, 0, STANDING, snakeIdle};
+
+const struct actor_attr stage_one_enemies[1] = {{SNAKE, 200, 103, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_two_enemies[1] = {{SNAKE, 140, 120, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
+
+// Add a list of enemies using actor attr.
 struct level_data
 {
   const unsigned char* map;
+  const struct actor_attr* enemies;
   int player_spawn_x;
   int player_spawn_y;
   int portal_x;
@@ -109,7 +178,8 @@ struct level_data
 };
 
 #define LEVEL_COUNT 2
-struct level_data level_list[LEVEL_COUNT] = {{nametable, 120, 100, 200, 56}, {nametable2, 32, 72, 232, 164}};
+struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120, 100, 200, 50}, 
+                                             {nametable2, stage_two_enemies, 32, 72, 235, 180}};
 
 
 
@@ -118,47 +188,7 @@ struct level_data level_list[LEVEL_COUNT] = {{nametable, 120, 100, 200, 56}, {na
 //#link "vrambuf.c"
 //#link "apu.c"
 
-// define a 2x2 metasprite
-#define DEF_METASPRITE_2X2(name,code,pal)\
-const unsigned char name[]={\
-        0,      0,      (code)+0,   pal, \
-        0,      8,      (code)+16,   pal, \
-        8,      0,      (code)+1,   pal, \
-        8,      8,      (code)+17,   pal, \
-        128};
 
-// define a 2x2 metasprite, flipped horizontally
-#define DEF_METASPRITE_2X2_FLIP(name,code,pal)\
-const unsigned char name[]={\
-        8,      0,      (code)+0,   (pal)|OAM_FLIP_H, \
-        8,      8,      (code)+16,   (pal)|OAM_FLIP_H, \
-        0,      0,      (code)+1,   (pal)|OAM_FLIP_H, \
-        0,      8,      (code)+17,   (pal)|OAM_FLIP_H, \
-        128};
-
-#define DEF_METASPRITE_2X1(name,code,pal)\
-const unsigned char name[]={\
-	0,	0,	(code)+0,   pal,\
-        0,	8,	(code)+16,  pal,\
-        128};
-
-#define DEF_METASPRITE_2X1_FLIP(name,code,pal)\
-const unsigned char name[]={\
-	0,	0,	(code)+0,   (pal)|OAM_FLIP_H,\
-        0,	8,	(code)+16,  (pal)|OAM_FLIP_H,\
-        128};
-
-#define PLAYER_Y_MIN 48
-#define PLAYER_Y_MAX 208
-#define PLAYER_X_MIN 8
-#define PLAYER_X_MAX 240
-#define ZERO_TILE 0xDA
-#define INVINCIBILITY_FRAMES 50
-
-typedef enum ActorState
-{
-  STANDING, RUNNING, JUMPING, FALLING, ATTACKING
-};
 
 DEF_METASPRITE_2X1(playerRunR0, 0x00, 0);
 DEF_METASPRITE_2X1(playerRunR1, 0x01, 0);
@@ -233,20 +263,7 @@ const unsigned char* const playerSwinging[10] =
   playerSwingL2, playerSwingL3, playerSwingL4
 };
 
-struct player_attr
-  {
-  short pos_x;
-  short pos_y;
-  short vel_x;
-  short vel_y;
-  short dir;
-  short life;
-  short invin;
-  byte state;
-  const unsigned char* meta;
-  };
-
-void add_velocity(struct player_attr* player)
+void add_velocity(struct actor_attr* player)
 {
   if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
         player->pos_x += player->vel_x;
@@ -255,7 +272,7 @@ void add_velocity(struct player_attr* player)
         player->pos_y += player->vel_y;
 }
 
-void handle_collision(struct player_attr* player)
+void handle_collision(struct actor_attr* player)
 {
   unsigned char bot_tile;
   unsigned char top_tile;
@@ -300,11 +317,17 @@ void handle_collision(struct player_attr* player)
   
 }
 
-void decrement_life(struct player_attr* player)
+void decrement_life(struct actor_attr* player)
 {
   if(player->life > 0)
   {
     player->invin = INVINCIBILITY_FRAMES;
+    APU_ENABLE(ENABLE_PULSE0|ENABLE_PULSE1);
+    APU_PULSE_DECAY(PULSE_CH0, 172, 128, 2, 4);
+    APU_PULSE_SWEEP(PULSE_CH0, 3, 1, 0);
+    APU_PULSE_DECAY(PULSE_CH1, 1907, 192, 7, 11);
+    APU_PULSE_SWEEP(PULSE_CH1, 3, 4, 0);
+    //APU_NOISE_DECAY(12|128, 9, 8);
     vram_adr(NTADR_A(life_pos, 2));
     vram_put(0xA9);
     life_pos -= 2;
@@ -313,7 +336,7 @@ void decrement_life(struct player_attr* player)
   }
 }
 
-void handle_pad(struct player_attr* player)
+void handle_pad(struct actor_attr* player)
  {
   char pad_result = pad_poll(0);
   
@@ -402,7 +425,7 @@ void handle_pad(struct player_attr* player)
   return;
  }
 
-void handle_anim(struct player_attr* player)
+void handle_anim(struct actor_attr* player)
 { 
   switch(player->state)
   {
@@ -493,10 +516,12 @@ void draw_status_info(int oam_num)
   handle_time();
 }
 
-void load_level(struct level_data* level, struct player_attr* player)
+void load_level(struct level_data* level, struct actor_attr* player)
 {  
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
+  
+  
   
   ppu_off();
   vrambuf_clear();
@@ -517,7 +542,8 @@ void load_level(struct level_data* level, struct player_attr* player)
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
   // X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, STATE
-  struct player_attr p1 = {120, 100, 0, 0, 0, 3, 0, FALLING};
+  struct actor_attr p1 = {PLAYER, 120, 100, 0, 0, 0, 3, 0, FALLING};
+  //struct actor_attr actor_list[5];
   
   char attributes = 0;
   
@@ -628,7 +654,7 @@ void main(void) {
   {
     const unsigned char* meta = 0;
     char cur_oam = 0;
-    cur_oam = oam_spr(0, 46, 0x20, 0, cur_oam);
+    cur_oam = oam_spr(0, 48, 0x20, 0, cur_oam);
     
     handle_pad(&p1);
     
@@ -641,13 +667,15 @@ void main(void) {
     
     splitxy(0, 48);
     
-    if((p1.pos_x + 8) > level_list[cur_level].portal_x && p1.pos_x < level_list[cur_level].portal_x + 8
-        && (p1.pos_y + 16) > level_list[cur_level].portal_y && p1.pos_y < level_list[cur_level].portal_x - 8)
+    if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
+        && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
     {
       if(cur_level < LEVEL_COUNT - 1)
     	cur_level++;
       load_level(&level_list[cur_level], &p1);
     }
+    
+    cur_oam = oam_meta_spr(level_list[cur_level].enemies[0].pos_x, level_list[cur_level].enemies[0].pos_y, cur_oam, level_list[cur_level].enemies[0].meta);
       
     ppu_wait_nmi();
     handle_collision(&p1);    
