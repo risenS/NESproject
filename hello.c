@@ -45,6 +45,7 @@ const unsigned char name[]={\
 #define PLAYER_X_MAX 240
 #define ZERO_TILE 0xDA
 #define INVINCIBILITY_FRAMES 50
+#define MAX_ACTORS 5
 
 const unsigned char nametable[668]={
 0x03,0x6e,0x6e,0x6f,0x63,0x64,0x65,0x03,0x02,0x60,0x61,0x62,0x1c,0x1c,0x8b,0x62,
@@ -134,6 +135,7 @@ const unsigned char nametable2[617]={
 0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x05,0x00
 };
 
+DEF_METASPRITE_2X2(emptyMeta, 0xEE, 0);
 DEF_METASPRITE_2X2(snakeIdle, 0x40, 0);
 
 typedef enum ActorState
@@ -149,6 +151,7 @@ typedef enum ActorType
 struct actor_attr
   {
   enum ActorType type;
+  bool is_alive;
   short pos_x;
   short pos_y;
   short vel_x;
@@ -161,10 +164,10 @@ struct actor_attr
   };
 
 
-struct actor_attr snake = {SNAKE, 100, 100, 0, 0, 1, 1, 0, STANDING, snakeIdle};
+struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, STANDING, snakeIdle};
 
-const struct actor_attr stage_one_enemies[1] = {{SNAKE, 200, 103, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_two_enemies[1] = {{SNAKE, 140, 120, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 200, 103, 0, 0, 1, 1, 0, STANDING, snakeIdle}, {SNAKE, true, 20, 64, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, STANDING, snakeIdle}, {SNAKE, true, 140, 56, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
 
 // Add a list of enemies using actor attr.
 struct level_data
@@ -175,11 +178,12 @@ struct level_data
   int player_spawn_y;
   int portal_x;
   int portal_y;
+  short num_enemies;
 };
 
 #define LEVEL_COUNT 2
-struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120, 100, 200, 50}, 
-                                             {nametable2, stage_two_enemies, 32, 72, 235, 180}};
+struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120, 100, 200, 50, 2}, 
+                                             {nametable2, stage_two_enemies, 32, 72, 235, 180, 2}};
 
 
 
@@ -234,6 +238,7 @@ int ones = 5;
 int life_pos = 9;
 bool called = false;
 int cur_level = 0;
+struct actor_attr actors[MAX_ACTORS];
 
 // Set first 3 rows to be collideable tiles, this will remove for loop every frame.
 const unsigned char collideables[31] = {0x6c, 0x6D, 0x6E, 0x04, 0x01, 0x44, 0x45, 0x46, 0x47, 0x11,
@@ -509,22 +514,29 @@ void handle_time()
 }
 
 
-void draw_status_info(int oam_num)
+void draw_status_info()
 {
-  int cur_oam = oam_num;
-  //cur_oam = oam_meta_spr(160, 16, cur_oam, playerSwinging[2]);
   handle_time();
 }
 
 void load_level(struct level_data* level, struct actor_attr* player)
-{  
+{ 
+  short i;
+  struct actor_attr empty = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, STANDING, emptyMeta};
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
   
-  
-  
   ppu_off();
   vrambuf_clear();
+  
+  for(i = 0; i < MAX_ACTORS; i++) // "Clear" the enemies.
+    actors[i] = empty;
+  
+  for(i = 0; i < level->num_enemies; i++) // Reload them based on level data.
+  {
+    actors[i] = level->enemies[i];
+  }
+  
   set_vram_update(updbuf);
   
   // Give some extra time for reaching the next level
@@ -539,13 +551,21 @@ void load_level(struct level_data* level, struct actor_attr* player)
   
 }
 
+int draw_actors(int cur_oam)
+{
+  int i;
+  int oam_count = cur_oam;
+  for(i = 0; i < MAX_ACTORS; i++)
+  {
+    oam_count = oam_meta_spr(actors[i].pos_x, actors[i].pos_y, oam_count, actors[i].meta);
+  };
+  return oam_count;
+};
+
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
-  // X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, STATE
-  struct actor_attr p1 = {PLAYER, 120, 100, 0, 0, 0, 3, 0, FALLING};
-  //struct actor_attr actor_list[5];
-  
-  char attributes = 0;
+  // ACTOR_TYPE, IS_ALIVE, X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, STATE
+  struct actor_attr p1 = {PLAYER, true, 120, 100, 0, 0, 0, 3, 0, FALLING};
   
   // set palette colors.
   pal_col(0,0x0F);	
@@ -557,15 +577,8 @@ void main(void) {
   pal_col(17, 0x06);
   pal_col(18, 0x36);
   pal_col(19, 0x28);
-  //pal_col(20, 0x19);
   
   bank_bg(0);
-  
-  //vram_adr(NTADR_A(0, 4));
-  //vram_unrle(nametable);
-  
-  //vram_adr(NTADR_C(0, 0));
-  //vram_unrle(nametable);
   
   vram_adr(NTADR_A(0, 0));
   vram_fill(0xA9, 32);
@@ -675,11 +688,11 @@ void main(void) {
       load_level(&level_list[cur_level], &p1);
     }
     
-    cur_oam = oam_meta_spr(level_list[cur_level].enemies[0].pos_x, level_list[cur_level].enemies[0].pos_y, cur_oam, level_list[cur_level].enemies[0].meta);
-      
+    cur_oam = draw_actors(cur_oam);
+    
     ppu_wait_nmi();
     handle_collision(&p1);    
-    draw_status_info(cur_oam);
+    draw_status_info();
     vrambuf_clear();
   }
 }
