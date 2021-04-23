@@ -626,13 +626,13 @@ void main(void) {
   vram_fill(0xB9, 32);
     
   ////// HEALTH /////////////
-  vram_adr(NTADR_A(2, 4));
+  vram_adr(NTADR_A(19, 4));
   vram_put(0xD3);
   vram_put(0xC8);
   vram_put(0xCC);
   vram_put(0xC4);
   vram_put(0xF9);
-  vram_adr(NTADR_A(2, 2));
+  vram_adr(NTADR_A(19, 2));
   vram_put(0xC7);
   vram_put(0xCF);
   vram_put(0xF9);
@@ -672,8 +672,6 @@ void main(void) {
     cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
     
     
-    //splitxy(0, 48);
-    
     if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
         && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
     {
@@ -683,8 +681,7 @@ void main(void) {
     }
     
     cur_oam = draw_actors(cur_oam);
-    cur_oam = cur_oam = oam_meta_spr(180, 16, cur_oam, empty_actor.meta);
-    cur_oam = cur_oam = oam_meta_spr(180, 16, cur_oam, p1.meta);
+    cur_oam = cur_oam = oam_meta_spr(120, 16, cur_oam, playerSwinging[2]);
     
     
     ppu_wait_nmi();
