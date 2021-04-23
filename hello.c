@@ -295,6 +295,15 @@ void decrement_life(struct actor_attr* player)
   }
 }
 
+void kill_enemy(int index)
+{
+  APU_ENABLE(ENABLE_PULSE1|ENABLE_NOISE);
+  APU_PULSE_DECAY(PULSE_CH1, 240, 64, 2, 15);
+  APU_PULSE_SWEEP(PULSE_CH1, 4, 4, 0);
+  APU_NOISE_DECAY(12|128, 9, 8);
+  actors[index] = empty_actor;
+}
+
 void handle_collision(struct actor_attr* player)
 {
   short i = 0;
@@ -349,10 +358,13 @@ void handle_collision(struct actor_attr* player)
     if(player->pos_x + 8 > actors[i].pos_x && player->pos_x < actors[i].pos_x + 16 &&
        player->pos_y + 16 > actors[i].pos_y && player->pos_y < actors[i].pos_y + 16)
     {
-      if(has_attacked <= 0 && actors[i].is_alive)
-      	decrement_life(player);
-      else
-        actors[i] = empty_actor;
+      if(actors[i].is_alive)
+      {
+      	if(has_attacked <= 0)
+      		decrement_life(player);
+      	else
+      	  kill_enemy(i);
+      }
     }
     i++;
   }
@@ -547,6 +559,11 @@ void load_level(struct level_data* level, struct actor_attr* player)
   short i;
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
+  
+  APU_ENABLE(ENABLE_PULSE0);
+  APU_PULSE_DECAY(PULSE_CH0, 587, 128, 6, 6);
+  APU_PULSE_SWEEP(PULSE_CH0, 4, 3, 1);
+  APU_NOISE_DECAY(12|128, 3,13);
   
   ppu_off();
   vrambuf_clear();
