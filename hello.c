@@ -163,7 +163,7 @@ struct actor_attr
   const unsigned char* meta;
   };
 
-
+struct actor_attr empty_actor = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, STANDING, emptyMeta};
 struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, STANDING, snakeIdle};
 
 const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 200, 103, 0, 0, 1, 1, 0, STANDING, snakeIdle}, {SNAKE, true, 20, 64, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
@@ -192,8 +192,6 @@ struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120,
 //#link "vrambuf.c"
 //#link "apu.c"
 
-
-
 DEF_METASPRITE_2X1(playerRunR0, 0x00, 0);
 DEF_METASPRITE_2X1(playerRunR1, 0x01, 0);
 DEF_METASPRITE_2X1(playerRunR2, 0x02, 0);
@@ -218,13 +216,13 @@ DEF_METASPRITE_2X1_FLIP(playerJumpL1, 0x07, 0);
 DEF_METASPRITE_2X1_FLIP(playerJumpL2, 0x08, 0);
 DEF_METASPRITE_2X1_FLIP(playerJumpL3, 0x09, 0);
 
-DEF_METASPRITE_2X2(playerSwingR0, 0x20, 0);
+DEF_METASPRITE_2X1(playerSwingR0, 0x20, 0);
 DEF_METASPRITE_2X2(playerSwingR1, 0x22, 0);
 DEF_METASPRITE_2X2(playerSwingR2, 0x24, 0);
 DEF_METASPRITE_2X2(playerSwingR3, 0x26, 0);
 DEF_METASPRITE_2X2(playerSwingR4, 0x28, 0);
 
-DEF_METASPRITE_2X2_FLIP(playerSwingL0, 0x20, 0);
+DEF_METASPRITE_2X1_FLIP(playerSwingL0, 0x20, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL1, 0x22, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL2, 0x24, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL3, 0x26, 0);
@@ -238,6 +236,7 @@ int ones = 5;
 int life_pos = 9;
 bool called = false;
 int cur_level = 0;
+short has_attacked = 0;
 struct actor_attr actors[MAX_ACTORS];
 
 // Set first 3 rows to be collideable tiles, this will remove for loop every frame.
@@ -277,8 +276,28 @@ void add_velocity(struct actor_attr* player)
         player->pos_y += player->vel_y;
 }
 
+void decrement_life(struct actor_attr* player)
+{
+  if(player->life > 0 && player->invin <= 0)
+  {
+    player->invin = INVINCIBILITY_FRAMES;
+    APU_ENABLE(ENABLE_PULSE0|ENABLE_PULSE1);
+    APU_PULSE_DECAY(PULSE_CH0, 172, 128, 2, 4);
+    APU_PULSE_SWEEP(PULSE_CH0, 3, 1, 0);
+    APU_PULSE_DECAY(PULSE_CH1, 1907, 192, 7, 11);
+    APU_PULSE_SWEEP(PULSE_CH1, 3, 4, 0);
+    //APU_NOISE_DECAY(12|128, 9, 8);
+    vram_adr(NTADR_A(life_pos, 2));
+    vram_put(0xA9);
+    life_pos -= 2;
+    player->life--;
+    vram_adr(0);
+  }
+}
+
 void handle_collision(struct actor_attr* player)
 {
+  short i = 0;
   unsigned char bot_tile;
   unsigned char top_tile;
   unsigned char left_tile;
@@ -313,32 +332,31 @@ void handle_collision(struct actor_attr* player)
   }
   if(left_tile <= 0x5f && left_tile != 0x1C)
   {
+    player->vel_x = 0;
     player->pos_x += 1;
   }
   if(right_tile <= 0x5f && right_tile != 0x1C)
   {
+    player->vel_x = 0;
     player->pos_x -= 1;
   }
   
-}
-
-void decrement_life(struct actor_attr* player)
-{
-  if(player->life > 0)
+  if(has_attacked > 0)
+    has_attacked--;
+  
+  while(i < level_list[cur_level].num_enemies)
   {
-    player->invin = INVINCIBILITY_FRAMES;
-    APU_ENABLE(ENABLE_PULSE0|ENABLE_PULSE1);
-    APU_PULSE_DECAY(PULSE_CH0, 172, 128, 2, 4);
-    APU_PULSE_SWEEP(PULSE_CH0, 3, 1, 0);
-    APU_PULSE_DECAY(PULSE_CH1, 1907, 192, 7, 11);
-    APU_PULSE_SWEEP(PULSE_CH1, 3, 4, 0);
-    //APU_NOISE_DECAY(12|128, 9, 8);
-    vram_adr(NTADR_A(life_pos, 2));
-    vram_put(0xA9);
-    life_pos -= 2;
-    player->life--;
-    vram_adr(0);
+    if(player->pos_x + 8 > actors[i].pos_x && player->pos_x < actors[i].pos_x + 16 &&
+       player->pos_y + 16 > actors[i].pos_y && player->pos_y < actors[i].pos_y + 16)
+    {
+      if(has_attacked <= 0 && actors[i].is_alive)
+      	decrement_life(player);
+      else
+        actors[i] = empty_actor;
+    }
+    i++;
   }
+  
 }
 
 void handle_pad(struct actor_attr* player)
@@ -347,7 +365,8 @@ void handle_pad(struct actor_attr* player)
   
   if(player->invin > 0)
     player->invin--;
-  player->vel_x = 0;
+  if(has_attacked <= 0)
+  	player->vel_x = 0;
   if(player->pos_y <= PLAYER_Y_MIN)
   {
     player->pos_y = PLAYER_Y_MIN + 1;
@@ -409,10 +428,13 @@ void handle_pad(struct actor_attr* player)
     }
   if(pad_result & PAD_B)
     {
+    	if(has_attacked <= 0)
+          player->vel_x = (player->dir?-1:1);
     	APU_ENABLE(ENABLE_PULSE1);
     	APU_PULSE_DECAY(PULSE_CH1, 2029, 64, 15, 8);
     	APU_PULSE_SWEEP(PULSE_CH1, 5, 3, 0);
-    	player->state = ATTACKING;
+    
+    	player->state = ATTACKING;  
     }
   if(pad_result & PAD_A)
     {
@@ -441,6 +463,8 @@ void handle_anim(struct actor_attr* player)
         player->meta = playerRunning[((player->pos_x >> 1) & 11) + (player->dir?0:12)];
         break;
     case ATTACKING:
+      player->invin = 15;
+      has_attacked = 15;
       if(player->dir)
       	player->vel_x = 2;
       else
@@ -454,7 +478,7 @@ void handle_anim(struct actor_attr* player)
           {
             player->state = STANDING;
             anim_number = 0;
-            player->meta = playerSwinging[0];
+            player->meta = playerSwinging[0 + (player->dir?0:5)];
           }
     	}
         break;
@@ -490,12 +514,11 @@ void handle_anim(struct actor_attr* player)
 
 void handle_time()
 {
-  bank_bg(0);
   vram_adr(NTADR_A(7, 3));
   vram_put(ZERO_TILE + hundreds);
   vram_put(ZERO_TILE + tens);
   vram_put(ZERO_TILE + ones);
-  vram_adr(0);
+  //vram_adr(NTADR_A(0, 0));
   
   if(ones <= 0 && tens > 0)
   {
@@ -522,7 +545,6 @@ void draw_status_info()
 void load_level(struct level_data* level, struct actor_attr* player)
 { 
   short i;
-  struct actor_attr empty = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, STANDING, emptyMeta};
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
   
@@ -530,7 +552,7 @@ void load_level(struct level_data* level, struct actor_attr* player)
   vrambuf_clear();
   
   for(i = 0; i < MAX_ACTORS; i++) // "Clear" the enemies.
-    actors[i] = empty;
+    actors[i] = empty_actor;
   
   for(i = 0; i < level->num_enemies; i++) // Reload them based on level data.
   {
@@ -587,11 +609,7 @@ void main(void) {
   vram_fill(0xB9, 32);
     
   ////// HEALTH /////////////
-  vram_adr(NTADR_A(1, 1));
-  vram_put(0x98);
-  vram_fill(0x99, 12);
-  vram_put(0x9A);
-  vram_adr(NTADR_A(2, 3));
+  vram_adr(NTADR_A(2, 4));
   vram_put(0xD3);
   vram_put(0xC8);
   vram_put(0xCC);
@@ -607,49 +625,8 @@ void main(void) {
   vram_put(0xA9);
   vram_put(0xAC);
   vram_put(0xA9);
-  vram_adr(NTADR_A(1, 4));
-  vram_put(0xB8);
-  vram_fill(0xB9, 12);
-  vram_put(0xBA);
-  vram_adr(NTADR_A(1, 2));
-  vram_put(0xA8);
-  vram_adr(NTADR_A(1, 3));
-  vram_put(0xA8);
   //////////////////////////
   
-  ////// CONNECTOR /////////
-  vram_adr(NTADR_A(15, 3));
-  vram_fill(0xB9, 3);
-  vram_adr(NTADR_A(23, 3));
-  vram_fill(0xB9, 3);
-  vram_adr(NTADR_A(15, 2));
-  vram_fill(0x99, 3);
-  vram_adr(NTADR_A(23, 2));
-  vram_fill(0x99, 3);
-  vram_adr(NTADR_A(18, 1));
-  vram_put(0x98);
-  vram_fill(0x99, 3);
-  vram_put(0x9A);
-  vram_adr(NTADR_A(18, 4));
-  vram_put(0xB8);
-  vram_fill(0xB9, 3);
-  vram_put(0xBA);
-  ///////////////////////////
-  
-  ////// ITEM SLOT //////////
-  vram_adr(NTADR_A(26, 1));
-  vram_put(0x98);
-  vram_fill(0x99, 3);
-  vram_put(0x9A);
-  vram_adr(NTADR_A(26, 4));
-  vram_put(0xB8);
-  vram_fill(0xB9, 3);
-  vram_put(0xBA);
-  vram_adr(NTADR_A(30, 2));
-  vram_put(0xAA);
-  vram_adr(NTADR_A(30, 3));
-  vram_put(0xAA);
-  ///////////////////////////
   
   // enable PPU rendering (turn on screen)
   
@@ -667,7 +644,7 @@ void main(void) {
   {
     const unsigned char* meta = 0;
     char cur_oam = 0;
-    cur_oam = oam_spr(0, 48, 0x20, 0, cur_oam);
+    //cur_oam = oam_spr(0, 48, 0x20, 0, cur_oam);
     
     handle_pad(&p1);
     
@@ -678,7 +655,7 @@ void main(void) {
     cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
     
     
-    splitxy(0, 48);
+    //splitxy(0, 48);
     
     if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
         && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
@@ -689,10 +666,13 @@ void main(void) {
     }
     
     cur_oam = draw_actors(cur_oam);
+    cur_oam = cur_oam = oam_meta_spr(180, 16, cur_oam, empty_actor.meta);
+    cur_oam = cur_oam = oam_meta_spr(180, 16, cur_oam, p1.meta);
+    
     
     ppu_wait_nmi();
-    handle_collision(&p1);    
-    draw_status_info();
     vrambuf_clear();
+    handle_collision(&p1);    
+    //draw_status_info();
   }
 }
