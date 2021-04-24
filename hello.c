@@ -44,6 +44,7 @@ const unsigned char name[]={\
 #define PLAYER_X_MIN 8
 #define PLAYER_X_MAX 240
 #define ZERO_TILE 0xDA
+#define A_TILE 0xC0
 #define INVINCIBILITY_FRAMES 50
 #define MAX_ACTORS 5
 
@@ -273,11 +274,17 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 
 int anim_number = 0;
 int anim_loop = 0;
-int hundreds = 5;
-int tens = 5;
-int ones = 5;
+
+// Timer
+char hundreds = 3;
+char tens = 0;
+char ones = 0;
+
+int score = 0;
+
 int life_pos = 26;
 bool called = false;
+bool needs_updated = true;
 int cur_level = 0;
 short has_attacked = 0;
 struct actor_attr actors[MAX_ACTORS];
@@ -310,6 +317,18 @@ const unsigned char* const playerSwinging[10] =
   playerSwingL2, playerSwingL3, playerSwingL4
 };
 
+void add_score(int amount)
+{
+  score += amount; 
+  needs_updated = true;
+}
+
+void decrement_score(int amount)
+{
+  score -= amount;
+  needs_updated = true;
+}
+
 void add_velocity(struct actor_attr* player)
 {
   if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
@@ -317,6 +336,14 @@ void add_velocity(struct actor_attr* player)
   
   if(player->pos_y < PLAYER_Y_MAX && player->pos_y > PLAYER_Y_MIN)
         player->pos_y += player->vel_y;
+}
+
+void lose_game()
+{
+  ppu_off();
+  vram_adr(NTADR_A(0, 0));
+  vram_unrle(0x00);
+  ppu_on_all();
 }
 
 void decrement_life(struct actor_attr* player)
@@ -331,11 +358,14 @@ void decrement_life(struct actor_attr* player)
     APU_PULSE_SWEEP(PULSE_CH1, 3, 4, 0);
     //APU_NOISE_DECAY(12|128, 9, 8);
     vram_adr(NTADR_A(life_pos, 2));
-    life_pos -= 2;
     vram_put(0xA9);
+    vrambuf_flush();
+    life_pos -= 2;
     player->life--;
-    //vram_adr(0);
+    decrement_score(100);
   }
+  else
+    lose_game();
 }
 
 void kill_enemy(int index)
@@ -344,6 +374,11 @@ void kill_enemy(int index)
   APU_PULSE_DECAY(PULSE_CH1, 240, 64, 2, 15);
   APU_PULSE_SWEEP(PULSE_CH1, 4, 4, 0);
   APU_NOISE_DECAY(12|128, 9, 8);
+  if(actors[index].type == SNAKE)
+  	add_score(150);
+  else
+    	add_score(250);
+  hundreds++;
   actors[index] = empty_actor;
 }
 
@@ -567,14 +602,50 @@ void handle_anim(struct actor_attr* player)
   }
 }
 
+void display_level()
+{
+  char msg[9];
+  msg[0] = A_TILE + 18;
+  msg[1] = A_TILE + 19;
+  msg[2] = A_TILE + 0;
+  msg[3] = A_TILE + 6;
+  msg[4] = A_TILE + 4;
+  msg[5] = 0xF9;
+  msg[6] = ZERO_TILE + cur_level + 1;
+  msg[7] = 0xFE;
+  msg[8] = ZERO_TILE + LEVEL_COUNT;
+  vrambuf_put(NTADR_A(4, 2), msg, 9);
+}
+
+void handle_score()
+{
+  char thousands = (score % 10000) / 1000;
+  char hundreds = (score % 1000) / 100;
+  char tens = (score % 100) / 10;
+  char ones = (score % 10);
+  
+  char msg[10];
+  msg[0] = A_TILE + 18;
+  msg[1] = A_TILE + 2;
+  msg[2] = A_TILE + 14;
+  msg[3] = A_TILE + 17;
+  msg[4] = A_TILE + 4;
+  msg[5] = 0xF9;
+  msg[6] = ZERO_TILE + thousands;
+  msg[7] = ZERO_TILE + hundreds;
+  msg[8] = ZERO_TILE + tens;
+  msg[9] = ZERO_TILE + ones;
+  vrambuf_put(NTADR_A(4, 4), msg, 10);
+}
+
 void handle_time()
 {
-  vram_adr(NTADR_A(7, 3));
-  vram_put(ZERO_TILE + hundreds);
-  vram_put(ZERO_TILE + tens);
-  vram_put(ZERO_TILE + ones);
-  //vram_adr(NTADR_A(0, 0));
-  
+  char buf[3];
+  buf[0] = ZERO_TILE + hundreds;
+  buf[1] = ZERO_TILE + tens;
+  buf[2] = ZERO_TILE + ones;
+  vrambuf_put(NTADR_A(24, 4), buf, 3);
+
   if(ones <= 0 && tens > 0)
   {
     tens--;
@@ -588,12 +659,16 @@ void handle_time()
   
   if(ones > 0 && nesclock() % 2 == 0)
   	ones--;
-  
 }
-
 
 void draw_status_info()
 {
+  if(needs_updated)
+  {
+    	display_level();
+  	handle_score();
+    	needs_updated = false;
+  }
   handle_time();
 }
 
@@ -602,6 +677,7 @@ void load_level(struct level_data* level, struct actor_attr* player)
   short i;
   player->pos_x = level->player_spawn_x;
   player->pos_y = level->player_spawn_y;
+  add_score(250);
   
   APU_ENABLE(ENABLE_PULSE0);
   APU_PULSE_DECAY(PULSE_CH0, 587, 128, 6, 6);
@@ -609,7 +685,6 @@ void load_level(struct level_data* level, struct actor_attr* player)
   APU_NOISE_DECAY(12|128, 3,13);
   
   ppu_off();
-  vrambuf_clear();
   
   for(i = 0; i < MAX_ACTORS; i++) // "Clear" the enemies.
     actors[i] = empty_actor;
@@ -618,8 +693,6 @@ void load_level(struct level_data* level, struct actor_attr* player)
   {
     actors[i] = level->enemies[i];
   }
-  
-  set_vram_update(updbuf);
   
   // Give some extra time for reaching the next level
   hundreds += 3;
@@ -630,7 +703,6 @@ void load_level(struct level_data* level, struct actor_attr* player)
   vram_unrle(level->map);
   pal_bright(4);
   ppu_on_all();
-  
 }
 
 int draw_actors(int cur_oam)
@@ -704,7 +776,6 @@ void main(void) {
   {
     const unsigned char* meta = 0;
     char cur_oam = 0;
-    //cur_oam = oam_spr(0, 48, 0x20, 0, cur_oam);
     
     handle_pad(&p1);
     
@@ -726,10 +797,10 @@ void main(void) {
     cur_oam = draw_actors(cur_oam);
     cur_oam = cur_oam = oam_meta_spr(120, 16, cur_oam, playerSwinging[2]);
     
-    
     ppu_wait_nmi();
     vrambuf_clear();
     handle_collision(&p1);    
-    //draw_status_info();
+    draw_status_info();
+    
   }
 }
