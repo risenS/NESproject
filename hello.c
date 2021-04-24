@@ -173,6 +173,21 @@ const unsigned char nametable3[522]={
 };
 
 
+const unsigned char loss_screen[177]={
+0x00,0x98,0x99,0x00,0x1d,0x9a,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,
+0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,
+0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,
+0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,
+0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,
+0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,
+0xa8,0xa9,0x00,0x1d,0xaa,0xa8,0xa9,0x00,0x1d,0xaa,0xb8,0xb9,0x00,0x1d,0xba,0x39,
+0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,
+0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x39,0x3a,0x49,
+0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,
+0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x49,0x4a,0x00,
+0x00
+};
+
 
 
 
@@ -200,16 +215,18 @@ struct actor_attr
   short dir;
   short life;
   short invin;
+  short kill_count;
   byte state;
   const unsigned char* meta;
   };
 
-struct actor_attr empty_actor = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, STANDING, emptyMeta};
-struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, STANDING, snakeIdle};
+struct actor_attr empty_actor = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, 0, STANDING, emptyMeta};
+struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle};
 
-const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 200, 103, 0, 0, 1, 1, 0, STANDING, snakeIdle}, {SNAKE, true, 20, 64, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, STANDING, snakeIdle}, {SNAKE, true, 140, 56, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_three_enemies[4] = {{OTHER, true, 140, 158, 0, 0, 1, 1, 0, STANDING, snakeIdle}};
+const struct actor_attr no_enemies[1] = {};
+const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 200, 103, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 20, 64, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 140, 56, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_three_enemies[4] = {{OTHER, true, 140, 158, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
 
 
 // Add a list of enemies using actor attr.
@@ -229,6 +246,7 @@ struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120,
                                              {nametable2, stage_two_enemies, 32, 72, 235, 180, 2},
                                              {nametable3, stage_three_enemies, 20, 180, 220, 58, 1}};
 
+struct level_data end_screens[2] = {{loss_screen, no_enemies, 0, 0, 0, 0, 0}};
 
 
 // link the pattern table into CHR ROM
@@ -272,13 +290,12 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL2, 0x24, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL3, 0x26, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 
+bool running = true;
 int anim_number = 0;
 int anim_loop = 0;
 
 // Timer
-char hundreds = 3;
-char tens = 0;
-char ones = 0;
+int timer = 500;
 
 int score = 0;
 
@@ -329,6 +346,40 @@ void decrement_score(int amount)
   needs_updated = true;
 }
 
+void load_level(struct level_data* level, struct actor_attr* player)
+{ 
+  short i;
+  player->pos_x = level->player_spawn_x;
+  player->pos_y = level->player_spawn_y;
+  player->kill_count = 0;
+  add_score(250);
+  
+  APU_ENABLE(ENABLE_PULSE0);
+  APU_PULSE_DECAY(PULSE_CH0, 587, 128, 6, 6);
+  APU_PULSE_SWEEP(PULSE_CH0, 4, 3, 1);
+  APU_NOISE_DECAY(12|128, 3,13);
+  
+  ppu_off();
+  
+  for(i = 0; i < MAX_ACTORS; i++) // "Clear" the enemies.
+    actors[i] = empty_actor;
+  
+  for(i = 0; i < level->num_enemies; i++) // Reload them based on level data.
+  {
+    actors[i] = level->enemies[i];
+  }
+  
+  // Give some extra time for reaching the next level
+  timer += 300;
+  
+  // Put the next stage into memory.
+  pal_bright(0);
+  vram_adr(NTADR_A(0, 6));
+  vram_unrle(level->map);
+  pal_bright(4);
+  ppu_on_all();
+}
+
 void add_velocity(struct actor_attr* player)
 {
   if(player->pos_x < PLAYER_X_MAX && player->pos_x > PLAYER_X_MIN)
@@ -338,12 +389,91 @@ void add_velocity(struct actor_attr* player)
         player->pos_y += player->vel_y;
 }
 
-void lose_game()
+void type_message(const char* charptr, byte x, byte y)
+{
+  char ch;
+  // repeat until end of string (0) is read
+  while ((ch = *charptr++)) {
+    {
+      // put character into nametable
+      ch += 127;
+      if(ch == 0x9F)
+        ch = 0xA9;
+      vrambuf_put(NTADR_A(x, y), &ch, 1);
+      x++;
+    }
+    // flush buffer and wait a few frames
+    vrambuf_flush();
+    delay(5);
+  }
+}
+
+// True / Lost to Health; False / Lost to Timer
+void lose_game(bool reason)
 {
   ppu_off();
-  vram_adr(NTADR_A(0, 0));
-  vram_unrle(0x00);
+  
+  // Put the next stage into memory.
+  vram_adr(NTADR_A(0, 6));
+  vram_unrle(end_screens[0].map);
   ppu_on_all();
+  oam_clear();
+  
+  type_message("YOU HAVE LOST", 10, 13);
+  
+  if(reason)
+    type_message("OUT OF HEALTH", 10, 16);
+  else
+    type_message("OUT OF TIME", 11, 16);
+  
+  delay(50);
+  running = false;
+}
+
+void win_game(struct actor_attr* player)
+{
+  char ten_thousands;
+  char thousands;
+  char hundreds;
+  char tens;
+  char ones;
+  
+  // Final Score Calculations.
+  score += timer;
+  
+  if(player->life == 3)
+    score += 500;
+  else if(player->life == 2)
+    score += 250;
+  
+  ten_thousands = (score % 100000) / 10000;
+  thousands = (score % 10000) / 1000;
+  hundreds = (score % 1000) / 100;
+  tens = (score % 100) / 10;
+  ones = (score % 10);
+  
+  ppu_off();
+  
+  // Put the next stage into memory.
+  vram_adr(NTADR_A(0, 6));
+  vram_unrle(end_screens[0].map);
+  ppu_on_all();
+  oam_clear();
+  
+  type_message("YOU HAVE WON", 10, 13);
+  vram_adr(NTADR_A(22, 13));
+  vram_put(0xF8);
+  type_message("FINAL SCORE", 11, 15);
+  vram_adr(NTADR_A(14, 16));
+  
+  vram_put(ZERO_TILE + ten_thousands);
+  vram_put(ZERO_TILE + thousands);
+  vram_put(ZERO_TILE + hundreds);
+  vram_put(ZERO_TILE + tens);
+  vram_put(ZERO_TILE + ones);
+  
+  delay(50);
+  running = false;
 }
 
 void decrement_life(struct actor_attr* player)
@@ -364,8 +494,6 @@ void decrement_life(struct actor_attr* player)
     player->life--;
     decrement_score(100);
   }
-  else
-    lose_game();
 }
 
 void kill_enemy(int index)
@@ -378,7 +506,7 @@ void kill_enemy(int index)
   	add_score(150);
   else
     	add_score(250);
-  hundreds++;
+  timer += 150;
   actors[index] = empty_actor;
 }
 
@@ -441,12 +569,14 @@ void handle_collision(struct actor_attr* player)
       	if(has_attacked <= 0)
       		decrement_life(player);
       	else
+        {
       	  kill_enemy(i);
+          player->kill_count++;
+        }
       }
     }
     i++;
-  }
-  
+  }  
 }
 
 void handle_pad(struct actor_attr* player)
@@ -619,46 +749,40 @@ void display_level()
 
 void handle_score()
 {
+  char ten_thousands = (score % 100000) / 10000;
   char thousands = (score % 10000) / 1000;
   char hundreds = (score % 1000) / 100;
   char tens = (score % 100) / 10;
   char ones = (score % 10);
   
-  char msg[10];
+  char msg[11];
   msg[0] = A_TILE + 18;
   msg[1] = A_TILE + 2;
   msg[2] = A_TILE + 14;
   msg[3] = A_TILE + 17;
   msg[4] = A_TILE + 4;
   msg[5] = 0xF9;
-  msg[6] = ZERO_TILE + thousands;
-  msg[7] = ZERO_TILE + hundreds;
-  msg[8] = ZERO_TILE + tens;
-  msg[9] = ZERO_TILE + ones;
-  vrambuf_put(NTADR_A(4, 4), msg, 10);
+  msg[6] = ZERO_TILE + ten_thousands;
+  msg[7] = ZERO_TILE + thousands;
+  msg[8] = ZERO_TILE + hundreds;
+  msg[9] = ZERO_TILE + tens;
+  msg[10] = ZERO_TILE + ones;
+  vrambuf_put(NTADR_A(4, 4), msg, 11);
 }
 
 void handle_time()
 {
+  char hundreds = (timer % 1000) / 100;
+  char tens = (timer % 100) / 10;
+  char ones = (timer % 10);
   char buf[3];
   buf[0] = ZERO_TILE + hundreds;
   buf[1] = ZERO_TILE + tens;
   buf[2] = ZERO_TILE + ones;
   vrambuf_put(NTADR_A(24, 4), buf, 3);
-
-  if(ones <= 0 && tens > 0)
-  {
-    tens--;
-    ones = 9;
-  }
-  else if(tens <= 0 && hundreds > 0)
-  {
-    hundreds--;
-    tens = 9;
-  }
   
-  if(ones > 0 && nesclock() % 2 == 0)
-  	ones--;
+  if(timer > 0)
+  	timer--;
 }
 
 void draw_status_info()
@@ -672,39 +796,6 @@ void draw_status_info()
   handle_time();
 }
 
-void load_level(struct level_data* level, struct actor_attr* player)
-{ 
-  short i;
-  player->pos_x = level->player_spawn_x;
-  player->pos_y = level->player_spawn_y;
-  add_score(250);
-  
-  APU_ENABLE(ENABLE_PULSE0);
-  APU_PULSE_DECAY(PULSE_CH0, 587, 128, 6, 6);
-  APU_PULSE_SWEEP(PULSE_CH0, 4, 3, 1);
-  APU_NOISE_DECAY(12|128, 3,13);
-  
-  ppu_off();
-  
-  for(i = 0; i < MAX_ACTORS; i++) // "Clear" the enemies.
-    actors[i] = empty_actor;
-  
-  for(i = 0; i < level->num_enemies; i++) // Reload them based on level data.
-  {
-    actors[i] = level->enemies[i];
-  }
-  
-  // Give some extra time for reaching the next level
-  hundreds += 3;
-  
-  // Put the next stage into memory.
-  pal_bright(0);
-  vram_adr(NTADR_A(0, 6));
-  vram_unrle(level->map);
-  pal_bright(4);
-  ppu_on_all();
-}
-
 int draw_actors(int cur_oam)
 {
   int i;
@@ -716,10 +807,26 @@ int draw_actors(int cur_oam)
   return oam_count;
 };
 
+void check_game_state(struct actor_attr* player)
+{
+  if(player->kill_count >= level_list[cur_level].num_enemies)
+  {
+    add_score(500);
+    player->kill_count = 0;
+  }
+  
+  if(player->life <= 0)
+    lose_game(true);
+  else if(timer <= 0)
+    lose_game(false);
+  else if (cur_level > LEVEL_COUNT - 1)
+    win_game(player);
+}
+
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
-  // ACTOR_TYPE, IS_ALIVE, X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, STATE
-  struct actor_attr p1 = {PLAYER, true, 120, 100, 0, 0, 0, 3, 0, FALLING};
+  // ACTOR_TYPE, IS_ALIVE, X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, KILL_COUNT, STATE
+  struct actor_attr p1 = {PLAYER, true, 120, 100, 0, 0, 0, 3, 0, 0, FALLING};
   
   // set palette colors.
   pal_col(0,0x0F);	
@@ -772,7 +879,7 @@ void main(void) {
   ppu_on_all();
   
   // infinite loop
-  while (1)
+  while (running)
   {
     const unsigned char* meta = 0;
     char cur_oam = 0;
@@ -789,18 +896,19 @@ void main(void) {
     if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
         && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
     {
-      if(cur_level < LEVEL_COUNT - 1)
+      if(cur_level < LEVEL_COUNT)
     	cur_level++;
       load_level(&level_list[cur_level], &p1);
     }
     
     cur_oam = draw_actors(cur_oam);
-    cur_oam = cur_oam = oam_meta_spr(120, 16, cur_oam, playerSwinging[2]);
+    cur_oam = cur_oam = oam_meta_spr(128, 16, cur_oam, playerSwinging[2]);
     
     ppu_wait_nmi();
     vrambuf_clear();
     handle_collision(&p1);    
-    draw_status_info();
-    
+    draw_status_info();  
+    check_game_state(&p1);
   }
+  oam_clear();
 }
