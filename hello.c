@@ -224,9 +224,9 @@ struct actor_attr empty_actor = {OTHER, false, 120, 100, 0, 0, 0, 3, 0, 0, STAND
 struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle};
 
 const struct actor_attr no_enemies[1] = {};
-const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 200, 103, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 20, 64, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 140, 56, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_three_enemies[4] = {{OTHER, true, 140, 158, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 210, 103, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 40, 64, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 135, 56, 0, 0, 0, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_three_enemies[4] = {{OTHER, true, 110, 158, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
 
 
 // Add a list of enemies using actor attr.
@@ -242,7 +242,7 @@ struct level_data
 };
 
 #define LEVEL_COUNT 3
-struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 120, 100, 200, 50, 2}, 
+struct level_data level_list[LEVEL_COUNT] = {{nametable, stage_one_enemies, 130, 130, 200, 50, 2}, 
                                              {nametable2, stage_two_enemies, 32, 72, 235, 180, 2},
                                              {nametable3, stage_three_enemies, 20, 180, 220, 58, 1}};
 
@@ -293,16 +293,12 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 bool running = true;
 int anim_number = 0;
 int anim_loop = 0;
-
-// Timer
 int timer = 500;
-
 int score = 0;
-
 int life_pos = 26;
 bool called = false;
-bool needs_updated = true;
 int cur_level = 0;
+bool needs_updated = true;
 short has_attacked = 0;
 struct actor_attr actors[MAX_ACTORS];
 
@@ -342,7 +338,10 @@ void add_score(int amount)
 
 void decrement_score(int amount)
 {
-  score -= amount;
+  if(score - amount >= 0)
+  	score -= amount;
+  else
+    score = 0;
   needs_updated = true;
 }
 
@@ -823,92 +822,151 @@ void check_game_state(struct actor_attr* player)
     win_game(player);
 }
 
+void handle_enemy_movement()
+{
+  int i = 0;
+  while(i < level_list[cur_level].num_enemies)
+  {
+    if(actors[i].type == SNAKE)
+    {
+      actors[i].invin--;
+      actors[i].pos_x += (actors[i].dir?1:-1);
+      if(actors[i].invin <= 0)
+      {
+        actors[i].dir = (actors[i].dir?0:1);
+        actors[i].invin = 30;
+      }
+    }
+    else
+    {
+      actors[i].pos_x += actors[i].vel_x;
+      actors[i].invin--;
+      if(actors[i].invin <= 0)
+      {
+        if(actors[i].dir)
+        {
+          if(actors[i].vel_x>0)
+          {
+          	actors[i].vel_x = 0;
+            	actors[i].dir = 0;
+          }
+          else
+          {
+            	actors[i].vel_x = 1;
+          }
+        }
+        else
+        {
+          if(actors[i].vel_x<0)
+          {
+          	actors[i].vel_x = 0;
+            	actors[i].dir = 1;
+          }
+          else
+          {
+            	actors[i].vel_x = -1;
+          }
+        }
+        actors[i].invin = 50;
+      }
+    }
+    i++;
+  }
+}
+
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
   // ACTOR_TYPE, IS_ALIVE, X_POS, Y_POS, VEL_X, VEL_Y, DIR, LIFE, INVINC, KILL_COUNT, STATE
-  struct actor_attr p1 = {PLAYER, true, 120, 100, 0, 0, 0, 3, 0, 0, FALLING};
-  
-  // set palette colors.
-  pal_col(0,0x0F);	
-  pal_col(1,0x0C);	
-  pal_col(2,0x2E);	
-  pal_col(3,0x04);
-  
-  // Character palette colors.
-  pal_col(17, 0x06);
-  pal_col(18, 0x36);
-  pal_col(19, 0x28);
-  
-  bank_bg(0);
-  
-  vram_adr(NTADR_A(0, 0));
-  vram_fill(0xA9, 32);
-  vram_fill(0xA9, 128);
-  vram_adr(NTADR_A(0, 5));
-  vram_fill(0xB9, 32);
-    
-  ////// HEALTH /////////////
-  vram_adr(NTADR_A(19, 4));
-  vram_put(0xD3);
-  vram_put(0xC8);
-  vram_put(0xCC);
-  vram_put(0xC4);
-  vram_put(0xF9);
-  vram_adr(NTADR_A(19, 2));
-  vram_put(0xC7);
-  vram_put(0xCF);
-  vram_put(0xF9);
-  vram_put(0xAC);
-  vram_put(0xA9);
-  vram_put(0xAC);
-  vram_put(0xA9);
-  vram_put(0xAC);
-  vram_put(0xA9);
-  //////////////////////////
+  struct actor_attr p1 = {PLAYER, true, 160, 100, 0, 0, 0, 3, 0, 0, FALLING};
   
   
-  // enable PPU rendering (turn on screen)
-  
-  oam_clear();
-  
-  vrambuf_clear();
-  set_vram_update(updbuf);
-  
-  load_level(&level_list[cur_level], &p1);
-  
-  ppu_on_all();
-  
-  // infinite loop
-  while (running)
+  while(1)
   {
-    const unsigned char* meta = 0;
-    char cur_oam = 0;
-    
-    handle_pad(&p1);
-    
-    handle_anim(&p1);
-      
-    bank_spr(1);
-    cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta);
-    cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
-    
-    
-    if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
-        && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
-    {
-      if(cur_level < LEVEL_COUNT)
-    	cur_level++;
-      load_level(&level_list[cur_level], &p1);
-    }
-    
-    cur_oam = draw_actors(cur_oam);
-    cur_oam = cur_oam = oam_meta_spr(128, 16, cur_oam, playerSwinging[2]);
-    
-    ppu_wait_nmi();
+    // set palette colors.
+    pal_col(0,0x0F);	
+    pal_col(1,0x0C);	
+    pal_col(2,0x2E);	
+    pal_col(3,0x04);
+
+    // Character palette colors.
+    pal_col(17, 0x06);
+    pal_col(18, 0x36);
+    pal_col(19, 0x28);
+
+    bank_bg(0);
+
+    vram_adr(NTADR_A(0, 0));
+    vram_fill(0xA9, 32);
+    vram_fill(0xA9, 128);
+    vram_adr(NTADR_A(0, 5));
+    vram_fill(0xB9, 32);
+
+    ////// HEALTH /////////////
+    vram_adr(NTADR_A(19, 4));
+    vram_put(0xD3);
+    vram_put(0xC8);
+    vram_put(0xCC);
+    vram_put(0xC4);
+    vram_put(0xF9);
+    vram_adr(NTADR_A(19, 2));
+    vram_put(0xC7);
+    vram_put(0xCF);
+    vram_put(0xF9);
+    vram_put(0xAC);
+    vram_put(0xA9);
+    vram_put(0xAC);
+    vram_put(0xA9);
+    vram_put(0xAC);
+    vram_put(0xA9);
+    //////////////////////////
+
+
+    oam_clear();
+
     vrambuf_clear();
-    handle_collision(&p1);    
-    draw_status_info();  
-    check_game_state(&p1);
+    set_vram_update(updbuf);
+    
+    running = true;
+    timer = 700;
+    cur_level = 0;
+    score = 0;
+    life_pos = 26;
+    p1.life = 3; 
+    
+    load_level(&level_list[cur_level], &p1);
+    
+    while (running)
+    {
+      const unsigned char* meta = 0;
+      char cur_oam = 0;
+
+      handle_pad(&p1);
+
+      handle_anim(&p1);
+
+      bank_spr(1);
+      cur_oam = oam_meta_spr(p1.pos_x, p1.pos_y, cur_oam, p1.meta);
+      cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
+
+
+      if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
+          && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
+      {
+        if(cur_level < LEVEL_COUNT)
+          cur_level++;
+        load_level(&level_list[cur_level], &p1);
+      }
+
+      cur_oam = draw_actors(cur_oam);
+      cur_oam = cur_oam = oam_meta_spr(128, 16, cur_oam, playerSwinging[2]);
+
+      ppu_wait_nmi();
+      vrambuf_clear();
+      handle_collision(&p1);
+      handle_enemy_movement();
+      draw_status_info();  
+      check_game_state(&p1);
+    }
+    ppu_off();
   }
-  oam_clear();
 }
