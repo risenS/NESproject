@@ -565,7 +565,7 @@ void handle_collision(struct actor_attr* player)
     {
       if(actors[i].is_alive)
       {
-      	if(has_attacked <= 0)
+      	if(has_attacked <= 0 && actors[i].is_alive)
       		decrement_life(player);
       	else
         {
