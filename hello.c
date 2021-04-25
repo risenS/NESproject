@@ -290,8 +290,18 @@ DEF_METASPRITE_2X2_FLIP(playerSwingL2, 0x24, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL3, 0x26, 0);
 DEF_METASPRITE_2X2_FLIP(playerSwingL4, 0x28, 0);
 
+// Snake Sprites
+DEF_METASPRITE_2X2(snakeMove0, 0x40, 0);
+DEF_METASPRITE_2X2(snakeMove1, 0x42, 0);
+DEF_METASPRITE_2X2(snakeMove2, 0x44, 0);
+
+DEF_METASPRITE_2X2_FLIP(snakeMove0F, 0x40, 0);
+DEF_METASPRITE_2X2_FLIP(snakeMove1F, 0x42, 0);
+DEF_METASPRITE_2X2_FLIP(snakeMove2F, 0x44, 0);
+
 bool running = true;
 int anim_number = 0;
+int e_anim_number = 0;
 int anim_loop = 0;
 int timer = 500;
 int score = 0;
@@ -302,10 +312,12 @@ bool needs_updated = true;
 short has_attacked = 0;
 struct actor_attr actors[MAX_ACTORS];
 
-// Set first 3 rows to be collideable tiles, this will remove for loop every frame.
-const unsigned char collideables[31] = {0x6c, 0x6D, 0x6E, 0x04, 0x01, 0x44, 0x45, 0x46, 0x47, 0x11,
-                                  0x14, 0x06, 0x07, 0x08, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
-                                  0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x4E, 0x4F, 0x2C, 0x39, 0x1E};
+
+const unsigned char* const snakeMovement[6] =
+{
+  snakeMove0, snakeMove1, snakeMove2,
+  snakeMove0F, snakeMove1F, snakeMove2F
+};
 
 const unsigned char* const playerRunning[24] = 
 {
@@ -673,6 +685,7 @@ void handle_pad(struct actor_attr* player)
 
 void handle_anim(struct actor_attr* player)
 { 
+  int i=0;
   switch(player->state)
   {
     case STANDING:
@@ -729,6 +742,13 @@ void handle_anim(struct actor_attr* player)
         }
         break;
   }
+  
+  //while(i < level_list[cur_level].num_enemies)
+  //{
+  //  if(actors[i].type == SNAKE && actors[i].is_alive)
+  //  	actors[i].meta = snakeMovement[(actors[i].pos_x % 3) + (actors[i].dir?0:2)];
+  //  i++;
+  //}
 }
 
 void display_level()
@@ -825,10 +845,13 @@ void check_game_state(struct actor_attr* player)
 void handle_enemy_movement()
 {
   int i = 0;
+  if(nesclock() % 5 == 0)
+  	e_anim_number++;
   while(i < level_list[cur_level].num_enemies)
   {
     if(actors[i].type == SNAKE)
     {
+      //actors[i].meta = snakeMovement[e_anim_number % 3 + (actors[i].dir?0:3)];
       actors[i].invin--;
       actors[i].pos_x += (actors[i].dir?1:-1);
       if(actors[i].invin <= 0)
