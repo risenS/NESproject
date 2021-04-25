@@ -965,7 +965,7 @@ void handle_enemy_movement()
       {
         actors[i].dir = (actors[i].dir?0:1);
         actors[i].invin = 30;
-        //actors[i].meta = snakeMovement[0 + (actors[i].dir?0:3)];
+        actors[i].meta = snakeMovement[0 + (actors[i].dir?0:3)];
       }
     }
     else if(actors[i].type == OTHER && actors[i].is_alive)
@@ -1082,8 +1082,8 @@ void main(void) {
       cur_oam = oam_spr(level_list[cur_level].portal_x, level_list[cur_level].portal_y, 0x4B, 0, cur_oam);
 
 
-      if(p1.pos_x >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
-          && p1.pos_y >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
+      if(p1.pos_x + 8 >= level_list[cur_level].portal_x && p1.pos_x <= level_list[cur_level].portal_x + 8
+          && p1.pos_y + 16 >= level_list[cur_level].portal_y && p1.pos_y <= level_list[cur_level].portal_y + 8)
       {
         if(cur_level < LEVEL_COUNT)
           cur_level++;
