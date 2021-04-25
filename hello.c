@@ -317,7 +317,7 @@ struct actor_attr snake = {SNAKE, true, 100, 100, 0, 0, 1, 1, 0, 0, STANDING, sn
 const struct actor_attr no_enemies[1] = {};
 const struct actor_attr empty_enemies[1] = {};
 const struct actor_attr stage_one_enemies[4] = {{SNAKE, true, 210, 103, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 40, 64, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
-const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {SNAKE, true, 135, 56, 0, 0, 0, 1, 0, 0, STANDING, snakeIdle}};
+const struct actor_attr stage_two_enemies[4] = {{SNAKE, true, 140, 120, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}, {OTHER, true, 175, 56, 0, 0, 0, 1, 0, 0, STANDING, otherIdle}};
 const struct actor_attr stage_three_enemies[4] = {{OTHER, true, 110, 158, 0, 0, 1, 1, 0, 0, STANDING, otherIdle}};
 const struct actor_attr stage_four_enemies[4] = {{SNAKE, true, 50, 150, 0, 0, 1, 1, 0, 0, STANDING, snakeIdle}};
 
