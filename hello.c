@@ -721,7 +721,12 @@ void handle_pad(struct actor_attr* player)
   }
   else if(player->pos_y >= PLAYER_Y_MAX - 1 && player->state != ATTACKING)
   {
-    player->state = STANDING;
+    int i;
+    for(i = 0; i < 2; i++)
+    {
+    	decrement_life(player);
+        player->invin = 0;
+    }
   }
     
   if(pad_result & PAD_RIGHT)
@@ -851,13 +856,6 @@ void handle_anim(struct actor_attr* player)
         }
         break;
   }
-  
-  //while(i < level_list[cur_level].num_enemies)
-  //{
-  //  if(actors[i].type == SNAKE && actors[i].is_alive)
-  //  	actors[i].meta = snakeMovement[(actors[i].pos_x % 3) + (actors[i].dir?0:2)];
-  //  i++;
-  //}
 }
 
 void display_level()
@@ -1006,6 +1004,8 @@ void handle_enemy_movement()
     i++;
   }
 }
+
+
 
 ////////////// main function, run after console reset /////////////////////////////////////////////////////////////////////////////
 void main(void) {
